@@ -1,38 +1,32 @@
-; Read
-; Compile with: nasm -f elf read.asm
-; Link with (64 bit systems require elf_i386 option): ld -m elf_i386 read.o -o read
-; Run with: ./read
- 
-%include    'functions.asm'
- 
+
 SECTION .data
-filename db 'add', 0h    ; the filename to create
-contents db 'Hello world!', 0h  ; the contents to write
+filename db 'fileElfRead', 0h    ; the filename to create
+
  handle dd 0
 newline  db 10,0
 lpHexString	db "0123456789ABCDEF"
 space   db " ",0h
 singleByte db 0
 
-elf_header      		db "ELF Header:", 0Ah, "    Magic: ", 0h
-elf_header_len 			equ $-elf_header
+e_header      		db "ELF Header:", 0Ah, "    Magic: ", 0h
+e_header_len 			equ $-e_header
 
 ; ELF Header Members msgs
-    elf_class_32b 	db "    Class:                ELF32",10, 0h
-    elf_class_msg_len 				equ $-elf_class_32b
-    elf_class_64b 	db "    Class:                ELF64",10, 0h
-    elf_class_msg 	dd elf_class_32b, elf_class_64b
-    elf_arch           dd 1 
+    e_class_32b 	db "    Class:                ELF32",10, 0h
+    e_class_msg_len 				equ $-e_class_32b
+    e_class_64b 	db "    Class:                ELF64",10, 0h
+    e_class_msg 	dd e_class_32b, e_class_64b
+    e_arch           dd 1 
 
  ; ELF Data
-    elf_data_32b  	db "    Data:                 2's complement, little endian",10, 0h
-    elf_data_msg_len 				equ $-elf_data_32b
-    elf_data_64b  	db "    Data:                 2's complement, big endian   ",10, 0h
-    elf_data_msg  	dd elf_data_32b, elf_data_64b
-    elf_data            dd 1
+    e_data_32b  	db "    Data:                 2's complement, little endian",10, 0h
+    e_data_msg_len 				equ $-e_data_32b
+    e_data_64b  	db "    Data:                 2's complement, big endian   ",10, 0h
+    e_data_msg  	dd e_data_32b, e_data_64b
+    e_data            dd 1
   ; ELF Version
-    elf_version_msg 	db "    Version:              1 (current)",10, 0h
-    elf_version_msg_len 			equ $-elf_version_msg
+    e_version_msg 	db "    Version:              1 (current)",10, 0h
+    e_version_msg_len 			equ $-e_version_msg
 
 
 ; ELF OS/ABI
@@ -56,101 +50,101 @@ elf_header_len 			equ $-elf_header
     OsAbi_11 	db "    OS/ABI:                CloudABI                     ",10, 0h
     OsAbi_12 	db "    OS/ABI:                Stratus Technologies OpenVOS ",10, 0h
     OsAbi_msg 	dd OsAbi_00 , OsAbi_01 , OsAbi_02 , OsAbi_03 , OsAbi_04 , OsAbi_06 , OsAbi_06 , OsAbi_07 , OsAbi_08 , OsAbi_09 , OsAbi_0A , OsAbi_0B , OsAbi_0C , OsAbi_0D , OsAbi_0E , OsAbi_0F , OsAbi_10 , OsAbi_11 ,OsAbi_12
-    elf_OsAbi   dd 1
+    e_OsAbi   dd 1
     
 ; ELF ABI Version
-    elf_ABIver_msg db "    ABI Version:         ", 0h
-    elf_ABIver_msg_len 				equ $-elf_ABIver_msg    
-    elf_ABIver dd 0
+    e_ABIver_msg db "    ABI Version:         ", 0h
+    e_ABIver_msg_len 				equ $-e_ABIver_msg    
+    e_ABIver dd 0
 ; ELF Type
-    elf_type_00 db "    Type:                 NONE ",10, 0h
-    elf_type_msg_len equ $-elf_type_00
-    elf_type_01 db "    Type:                 REL  ",10, 0h
-    elf_type_02 db "    Type:                 EXEC ",10, 0h
-    elf_type_03 db "    Type:                 DYN  ",10, 0h
-    elf_type_04 db "    Type:                 CORE ",10, 0h 
-    elf_type_FE00 db "    Type:               LOOS ",10, 0h   
+    e_type_00 db "    Type:                 NONE ",10, 0h
+    e_type_msg_len equ $-e_type_00
+    e_type_01 db "    Type:                 REL  ",10, 0h
+    e_type_02 db "    Type:                 EXEC ",10, 0h
+    e_type_03 db "    Type:                 DYN  ",10, 0h
+    e_type_04 db "    Type:                 CORE ",10, 0h 
+    e_type_FE00 db "    Type:               LOOS ",10, 0h   
     
-    elf_type_msg dd elf_type_00, elf_type_01, elf_type_02, elf_type_03, 0xFEFC dup(elf_type_04) , 0xFF dup(elf_type_FE00) 
-    elf_type dd 0
+    e_type_msg dd e_type_00, e_type_01, e_type_02, e_type_03, 0xFEFC dup(e_type_04) , 0xFF dup(e_type_FE00) 
+    e_type dd 0
  
 
 ; ELF Machine
-    elf_machine_00 db "    Machine:              Null          ",10, 0h
-    elf_machine_01 db "    Machine:              AT&T WE 32100 ",10, 0h
-    elf_machine_msg_len equ $-elf_machine_01
-    elf_machine_02 db "    Machine:              SPARC         ",10, 0h
-    elf_machine_03 db "    Machine:              Intel 80386   ",10, 0h
-    elf_machine_04 db "    Machine:              M68k          ",10, 0h
-    elf_machine_05 db "    Machine:              M88K          ",10, 0h
-    elf_machine_06 db "    Machine:              INTEL MCU     ",10, 0h
-    elf_machine_07 db "    Machine:              INTEL 80860   ",10, 0h
-    elf_machine_08 db "    Machine:              MIPS          ",10, 0h
-    elf_machine_09 db "    Machine:              IBM SYSTEM/370",10, 0h
-    elf_machine_0A db "    Machine:              MIPS RS 3000  ",10, 0h
-    elf_machine_13 db "    Machine:              INTEL 80960   ",10, 0h
-    elf_machine_17 db "    Machine:              IBM SPU/SPC   ",10, 0h    
-    elf_machine_28 db "    Machine:              ARM           ",10, 0h
-    elf_machine_3E db "    Machine:              AMD X86-64    ",10, 0h
-    elf_machine_B7 db "    Machine:              ARM 64-BITS   ",10, 0h
-    elf_machine_F3 db "    Machine:              RISC-V        ",10, 0h
+    e_machine_00 db "    Machine:              Null          ",10, 0h
+    e_machine_01 db "    Machine:              AT&T WE 32100 ",10, 0h
+    e_machine_msg_len equ $-e_machine_01
+    e_machine_02 db "    Machine:              SPARC         ",10, 0h
+    e_machine_03 db "    Machine:              Intel 80386   ",10, 0h
+    e_machine_04 db "    Machine:              M68k          ",10, 0h
+    e_machine_05 db "    Machine:              M88K          ",10, 0h
+    e_machine_06 db "    Machine:              INTEL MCU     ",10, 0h
+    e_machine_07 db "    Machine:              INTEL 80860   ",10, 0h
+    e_machine_08 db "    Machine:              MIPS          ",10, 0h
+    e_machine_09 db "    Machine:              IBM SYSTEM/370",10, 0h
+    e_machine_0A db "    Machine:              MIPS RS 3000  ",10, 0h
+    e_machine_13 db "    Machine:              INTEL 80960   ",10, 0h
+    e_machine_17 db "    Machine:              IBM SPU/SPC   ",10, 0h    
+    e_machine_28 db "    Machine:              ARM           ",10, 0h
+    e_machine_3E db "    Machine:              AMD X86-64    ",10, 0h
+    e_machine_B7 db "    Machine:              ARM 64-BITS   ",10, 0h
+    e_machine_F3 db "    Machine:              RISC-V        ",10, 0h
     
-    elf_machine_msg dd elf_machine_00,elf_machine_01 , elf_machine_02 , elf_machine_03 , elf_machine_04 , elf_machine_05 , elf_machine_06 , elf_machine_07 , elf_machine_08 , elf_machine_09 , 0x9 dup(elf_machine_0A), 0x4 dup(elf_machine_13),0x11 dup(elf_machine_17),0x16 dup(elf_machine_28),0x79 dup(elf_machine_3E),0x3C dup(elf_machine_B7),0xE dup(elf_machine_F3)
+    e_machine_msg dd e_machine_00,e_machine_01 , e_machine_02 , e_machine_03 , e_machine_04 , e_machine_05 , e_machine_06 , e_machine_07 , e_machine_08 , e_machine_09 , 0x9 dup(e_machine_0A), 0x4 dup(e_machine_13),0x11 dup(e_machine_17),0x16 dup(e_machine_28),0x79 dup(e_machine_3E),0x3C dup(e_machine_B7),0xE dup(e_machine_F3)
 
-    elf_machine dd 0
+    e_machine dd 0
  ; ELF Version
-    elf_version2_msg db "    Version:              0x1", 10, 0h
-    elf_version2_msg_len equ $-elf_version2_msg 
+    e_version2_msg db "    Version:              0x1", 10, 0h
+    e_version2_msg_len equ $-e_version2_msg 
  ; ELF Entry
-    elf_entry_msg    db "    Entry point address:  0x", 0h
-    elf_entry_msg_len equ $-elf_entry_msg   
+    e_entry_msg    db "    Entry point address:  0x", 0h
+    e_entry_msg_len equ $-e_entry_msg   
   
   ;; ELF Program Offset
-    elf_phoff_msg db "    Start of program headers:          ", 0h
-    elf_phoff_msg_len equ $-elf_phoff_msg
-    elf_phoff dd 1
+    e_phoff_msg db "    Start of program headers:          ", 0h
+    e_phoff_msg_len equ $-e_phoff_msg
+    e_phoff dd 1
         
     bytes_into_file_msg db " (bytes into file)", 0Ah
     bytes_into_file_msg_len equ $-bytes_into_file_msg
   
   ; ELF Section Offset
-    elf_shoff_msg db "    Start of section headers:          ", 0h
-    elf_shoff_msg_len equ $-elf_shoff_msg
-    elf_shoff dd 1  
+    e_shoff_msg db "    Start of section headers:          ", 0h
+    e_shoff_msg_len equ $-e_shoff_msg
+    e_shoff dd 1  
    
    ; ELF Flags
-    elf_sh_flags_msg db "    Flags:                             0x", 0h
-    elf_sh_flags_msg_len equ $-elf_sh_flags_msg
+    e_sh_flags_msg db "    Flags:                             0x", 0h
+    e_sh_flags_msg_len equ $-e_sh_flags_msg
 
     ; ELF Header Size
-    elf_ehsize_msg db "    Size of this header:               ", 0h
-    elf_ehsize_msg_len equ $-elf_ehsize_msg
+    e_ehsize_msg db "    Size of this header:               ", 0h
+    e_ehsize_msg_len equ $-e_ehsize_msg
     bytes_msg db " (bytes)", 0Ah
     bytes_msg_len equ $-bytes_msg
 
     ; ELF Program Header Size
-    elf_phentsize_msg db "    Size of program header:            ", 0h
-    elf_phentsize_msg_len equ $-elf_phentsize_msg
-    elf_phentsize dd 1
+    e_phentsize_msg db "    Size of program header:            ", 0h
+    e_phentsize_msg_len equ $-e_phentsize_msg
+    e_phentsize dd 1
 
     ; Number of Program Header Size
-    elf_phnum_msg db "    Number of program header:          ", 0h
-    elf_phnum_msg_len equ $-elf_phnum_msg
-    elf_phnum dd 1
+    e_phnum_msg db "    Number of program header:          ", 0h
+    e_phnum_msg_len equ $-e_phnum_msg
+    e_phnum dd 1
 
     ; Size of Section Header
-    elf_shentsize_msg db "    Size of section headers:           ", 0h
-    elf_shentsize_msg_len equ $-elf_shentsize_msg
-    elf_shentsize dd 1
+    e_shentsize_msg db "    Size of section headers:           ", 0h
+    e_shentsize_msg_len equ $-e_shentsize_msg
+    e_shentsize dd 1
     ; Number of Section Header
-    elf_shnum_msg db "    Number of section headers:         ", 0h
-    elf_shnum_msg_len equ $-elf_shnum_msg
-    elf_shnum dd 1
+    e_shnum_msg db "    Number of section headers:         ", 0h
+    e_shnum_msg_len equ $-e_shnum_msg
+    e_shnum dd 1
 
     ; Index of Section Header Tbable index
-    elf_shstrndx_msg db "    Section header string table index: ", 0h
-    elf_shstrndx_msg_len equ $-elf_shstrndx_msg
-    elf_shstrndx dd 1
+    e_shstrndx_msg db "    Section header string table index: ", 0h
+    e_shstrndx_msg_len equ $-e_shstrndx_msg
+    e_shstrndx dd 1
      
      
     ;;;
@@ -173,13 +167,10 @@ elf_header_len 			equ $-elf_header
     p_type_msg_6f           db "  HIOS          ",0h
     p_type_msg_70           db "  LOPROC        ",0h
     p_type_msg_7f           db "  HIPROC        ",0h
-    p_type_gnu_eh_frame_msg db "  GNU_EH_FRAME  ",0h
-    p_type_gnu_stack_msg    db "  GNU_STACK     ",0h
-    p_type_gnu_relro_msg    db "  GNU_RELRO     ",0h
-    p_type_gnu_property_msg db "  GNU_PROPERTY  ",0h
+  
 
-    p_type_msg dd p_type_msg_00 ,p_type_msg_01 ,p_type_msg_02 ,p_type_msg_03 ,p_type_msg_04 ,p_type_msg_05 ,p_type_msg_06 ,p_type_msg_07 ,p_type_msg_60 ,p_type_msg_6f ,p_type_msg_70 ,p_type_msg_7f,  p_type_gnu_eh_frame_msg , p_type_gnu_stack_msg , p_type_gnu_relro_msg , p_type_gnu_property_msg
-    p_type_value_list dd 0x00 ,0x01 ,0x02 ,0x03 ,0x04 ,0x05 ,0x06 ,0x07 ,0x60000000 ,0x6f000000 ,0x70000000 ,0x7f000000, 0x6474e550, 0x6474e551, 0x6474e552, 0x6474e553
+    p_type_msg dd p_type_msg_00 , p_type_msg_01 , p_type_msg_02 , p_type_msg_03 , p_type_msg_04 , p_type_msg_05 , p_type_msg_06 , p_type_msg_07 ,0x59 dup(p_type_msg_60),0xf dup(p_type_msg_6f) , p_type_msg_70 ,0xf dup(p_type_msg_7f)  
+    
     ; p_flags
     p_flags_msg_01 db "  E", 0h
     p_flags_msg_len equ $-p_flags_msg_01
@@ -189,8 +180,7 @@ elf_header_len 			equ $-elf_header
     p_flags_msg_06 db "RW ",0h
     p_flags_msg_05 db "R E",0h
     p_flags_msg_07 db "RWE",0h
-    p_flags_msg dd p_flags_msg_01 ,p_flags_msg_02 ,p_flags_msg_04 ,p_flags_msg_03 ,p_flags_msg_06 ,p_flags_msg_05 ,p_flags_msg_07
-    p_flags_value_list dd 0x01 ,0x02 ,0x04 ,0x03 ,0x06 ,0x05 ,0x07
+    p_flags_msg dd p_flags_msg_01 , p_flags_msg_02 ,p_flags_msg_04 , p_flags_msg_03 ,p_flags_msg_06 , p_flags_msg_05 , p_flags_msg_07 
     p_flags dd 1
     
      
@@ -199,34 +189,53 @@ elf_header_len 			equ $-elf_header
      
      
     ; Section Header msgs
-    sectionHeader_msg db 0Ah, "Section Headers:", 0Ah, 0h
+    sectionHeader_msg db 0Ah, "Section Headers:", 0Ah,"Name            Type           Addr      Off      Size     Lk Info Al ES", 0Ah,0h
     sectionHeader_msg_len equ $-sectionHeader_msg
     open_square_bracket db "[ ", 0h
     open_square_bracket_len equ $-open_square_bracket
     name_msg db " ] Name: ", 0h
     name_msg_len equ $-name_msg
+    
     ; sh_type
-    sh_type_msg_00 db "       Type: NULL           ", 0Ah, 0h
+    sh_type_msg_00 db "NULL           ", 0h
     sh_type_msg_len equ $-sh_type_msg_00
-    sh_type_msg_01 db "       Type: PROGBITS       ", 0Ah, 0h
-    sh_type_msg_02 db "       Type: SYMTAB         ", 0Ah, 0h
-    sh_type_msg_03 db "       Type: STRTAB         ", 0Ah, 0h
-    sh_type_msg_04 db "       Type: RELA           ", 0Ah, 0h
-    sh_type_msg_05 db "       Type: HASH           ", 0Ah, 0h
-    sh_type_msg_06 db "       Type: DYNAMIC        ", 0Ah, 0h
-    sh_type_msg_07 db "       Type: NOTE           ", 0Ah, 0h
-    sh_type_msg_08 db "       Type: NOBITS         ", 0Ah, 0h
-    sh_type_msg_09 db "       Type: REL            ", 0Ah, 0h
-    sh_type_msg_0A db "       Type: SHLIB          ", 0Ah, 0h
-    sh_type_msg_0B db "       Type: DYNSYM         ", 0Ah, 0h
-    sh_type_msg_0E db "       Type: INIT_ARRAY     ", 0Ah, 0h
-    sh_type_msg_0F db "       Type: FINI_ARRAY     ", 0Ah, 0h
-    sh_type_msg_10 db "       Type: PREINIT_ARRAY  ", 0Ah, 0h
-    sh_type_msg_11 db "       Type: GROUP          ", 0Ah, 0h
-    sh_type_msg_12 db "       Type: SYMTAB_SHNDX   ", 0Ah, 0h
-    sh_type_msg_13 db "       Type: NUM            ", 0Ah, 0h
-    sh_type_msg dd   sh_type_msg_00 , sh_type_msg_01 , sh_type_msg_02 , sh_type_msg_03 , sh_type_msg_04 , sh_type_msg_05 , sh_type_msg_06 , sh_type_msg_07 , sh_type_msg_08 , sh_type_msg_09 , sh_type_msg_0A , sh_type_msg_0B , sh_type_msg_0E , sh_type_msg_0F , sh_type_msg_10 , sh_type_msg_11 , sh_type_msg_12 , sh_type_msg_13
-   
+    sh_type_msg_01 db "PROGBITS       ", 0h
+    sh_type_msg_02 db "SYMTAB         ", 0h
+    sh_type_msg_03 db "STRTAB         ", 0h
+    sh_type_msg_04 db "RELA           ", 0h
+    sh_type_msg_05 db "HASH           ", 0h
+    sh_type_msg_06 db "DYNAMIC        ", 0h
+    sh_type_msg_07 db "NOTE           ", 0h
+    sh_type_msg_08 db "NOBITS         ", 0h
+    sh_type_msg_09 db "REL            ", 0h
+    sh_type_msg_0A db "SHLIB          ", 0h
+    sh_type_msg_0B db "DYNSYM         ", 0h
+    sh_type_msg_0E db "INIT_ARRAY     ", 0h
+    sh_type_msg_0F db "FINI_ARRAY     ", 0h
+    sh_type_msg_10 db "PREINIT_ARRAY  ", 0h
+    sh_type_msg_11 db "GROUP          ", 0h
+    sh_type_msg_12 db "SYMTAB_SHNDX   ", 0h
+    sh_type_msg_13 db "NUM            ", 0h
+    sh_type_msg_14 db "LOOS           ", 0h
+    sh_type_msg dd   sh_type_msg_00 , sh_type_msg_01 , sh_type_msg_02 , sh_type_msg_03 , sh_type_msg_04 , sh_type_msg_05 , sh_type_msg_06 , sh_type_msg_07 , sh_type_msg_08 , sh_type_msg_09 , sh_type_msg_0A , 0x3 dup(sh_type_msg_0B) , sh_type_msg_0E , sh_type_msg_0F , sh_type_msg_10 , sh_type_msg_11 , sh_type_msg_12 , sh_type_msg_13,sh_type_msg_14
+    sh_type dd 1
+    
+    sh_flags_msg_00 db "N",  0h
+    sh_flags_msg_len equ $-sh_flags_msg_00
+    sh_flags_msg_01 db "W",  0h
+    sh_flags_msg_02 db "A",  0h
+    sh_flags_msg_04 db "X",  0h
+    sh_flags_msg_10 db "M",  0h
+    sh_flags_msg_20 db "S",  0h
+    sh_flags_msg_40 db "I",  0h
+    sh_flags_msg_80 db "L",  0h
+    sh_flags_msg_100 db " ",  0h
+    sh_flags_msg_200 db "G",  0h
+    sh_flags_msg_400 db "T",  0h
+    sh_flags_msg dd sh_flags_msg_400,sh_flags_msg_200, sh_flags_msg_100, sh_flags_msg_80, sh_flags_msg_40, sh_flags_msg_20, sh_flags_msg_10, sh_flags_msg_04, sh_flags_msg_02, sh_flags_msg_01
+    sh_flags_value_list dd 0x400,0x200, 0x100, 0x80, 0x40, 0x20, 0x10, 0x04, 0x02, 0x01
+    
+    
     NameSection_offset dd 0
     NameSection_virtOffset dd 0
     cur_offset dd 0  
@@ -261,8 +270,8 @@ _start:
     int     80h
     mov [handle], eax
     
-    mov ecx, elf_header
-    mov edx, elf_header_len
+    mov ecx, e_header
+    mov edx, e_header_len
     call print
     
     mov edx,4
@@ -295,7 +304,7 @@ _start:
     lea edi, [tmp_string]
     mov ecx, 1
     movzx eax, word [BytesBuffer]
-    mov [elf_arch], eax    
+    mov [e_arch], eax    
     call print_string      ;in byte vua doc
     call printSpace
    
@@ -310,7 +319,7 @@ _start:
     lea edi, [tmp_string]
     mov ecx, 1
     movzx eax, word [BytesBuffer]
-    mov [elf_data], eax    
+    mov [e_data], eax    
     call print_string      ;in byte vua doc
     call printSpace
 
@@ -341,7 +350,7 @@ _start:
     lea edi, [tmp_string]
     mov ecx, 1
     movzx eax, word [BytesBuffer]
-    mov [elf_OsAbi], eax
+    mov [e_OsAbi], eax
     call print_string      ;in byte vua doc
     call printSpace
  
@@ -356,7 +365,7 @@ _start:
     lea edi, [tmp_string]
     mov ecx, 1
     movzx eax, word [BytesBuffer]
-    mov [elf_ABIver], eax
+    mov [e_ABIver], eax
     call print_string      ;in byte vua doc
     call printSpace
     
@@ -387,8 +396,8 @@ _start:
     mov edx, 2
     int 80h
 
-    movzx eax, word [BytesBuffer]
-    mov [elf_type], eax
+    mov eax, [BytesBuffer]
+    mov [e_type], eax
 
     ;; read machine
     mov eax, 3
@@ -397,8 +406,8 @@ _start:
     mov edx, 2
     int 80h
 
-    movzx eax, word [BytesBuffer]
-    mov [elf_machine], eax
+    mov eax, [BytesBuffer]
+    mov [e_machine], eax
     
     ;; read VERSION
     mov eax, 3
@@ -414,39 +423,39 @@ _start:
     
     call newLine
     ;   print ELF Class
-    mov eax, dword [elf_arch]
+    mov eax, dword [e_arch]
     dec eax
-    mov edx, elf_class_msg
+    mov edx, e_class_msg
     mov ecx, [eax*4 + edx]
-    mov edx, elf_class_msg_len
+    mov edx, e_class_msg_len
     call print
     
     ;   print ELF data
-    mov eax, dword [elf_data]
+    mov eax, dword [e_data]
     dec eax
-    mov edx, elf_data_msg
+    mov edx, e_data_msg
     mov ecx, [eax*4 + edx]
-    mov edx, elf_data_msg_len
+    mov edx, e_data_msg_len
     call print
 
     ;   print ELF version
-    mov ecx, elf_version_msg
-    mov edx, elf_version_msg_len
+    mov ecx, e_version_msg
+    mov edx, e_version_msg_len
     call print
      
         ;   print ELF OS/ABI
-    mov eax, dword [elf_OsAbi]
+    mov eax, dword [e_OsAbi]
     mov edx, OsAbi_msg
     mov ecx, [eax*4 + edx]
     mov edx, OsAbi_msg_len
     call print  
 
     ;   print ELF ABI Version
-    mov ecx, elf_ABIver_msg
-    mov edx, elf_ABIver_msg_len
+    mov ecx, e_ABIver_msg
+    mov edx, e_ABIver_msg_len
     call print
   
-    movzx eax, word [elf_ABIver]
+    movzx eax, word [e_ABIver]
     mov esi, tmp_string1
     call itoa
     mov ecx, eax
@@ -454,32 +463,31 @@ _start:
     call print
     call newLine 
     ;   print ELF Type
-    mov eax, [elf_type]
-    mov ecx, [elf_type_msg + 4* eax]
-    mov edx, elf_type_msg_len
+    mov eax, [e_type]
+    mov ecx, [e_type_msg + 4* eax]
+    mov edx, e_type_msg_len
     call print
  
 
      ;   print ELF machine
-    mov eax, [elf_machine]
-    mov ecx, [elf_machine_msg + 4* eax]
-    mov edx, elf_machine_msg_len
+    mov eax, [e_machine]
+    mov ecx, [e_machine_msg + 4* eax]
+    mov edx, e_machine_msg_len
     call print
 
     
     ;   print ELF version
-    mov ecx, elf_version2_msg
-    mov edx, elf_version2_msg_len
+    mov ecx, e_version2_msg
+    mov edx, e_version2_msg_len
     call print
     
     ;   print ELF Entry
-    mov ecx, elf_entry_msg
-    mov edx, elf_entry_msg_len
+    mov ecx, e_entry_msg
+    mov edx, e_entry_msg_len
     call print
     
-    mov edx, [elf_arch]
-    shl edx, 2             ; edx = 4 if e_arch = 1
-                                    ; edx = 8 if e_arch = 2                             
+    mov edx, [e_arch]
+    shl edx, 2             ; edx= e_arch*4                              
     mov eax, 3
     mov ebx, eax
     mov ecx, BytesBuffer
@@ -493,11 +501,11 @@ _start:
     
     ;   print ELF Program Header 
     
-    mov ecx, elf_phoff_msg
-    mov edx, elf_phoff_msg_len
+    mov ecx, e_phoff_msg
+    mov edx, e_phoff_msg_len
     call print
 
-    mov edx, [elf_arch]
+    mov edx, [e_arch]
     shl edx, 2                
     mov eax,3
     mov ebx, eax
@@ -505,7 +513,7 @@ _start:
     int 80h
 
     mov eax, dword [BytesBuffer]
-    mov [elf_phoff], eax
+    mov [e_phoff], eax
     lea esi, [tmp_string]
     call itoa
     mov ecx, eax
@@ -516,13 +524,18 @@ _start:
     mov edx, bytes_into_file_msg_len
     call print
 
+
+
+
+
+
     ;   print ELF Section Header 
     
-    mov ecx, elf_shoff_msg
-    mov edx, elf_shoff_msg_len
+    mov ecx, e_shoff_msg
+    mov edx, e_shoff_msg_len
     call print
 
-    mov edx, [elf_arch]
+    mov edx, [e_arch]
     shl edx, 2                
     mov eax,3
     mov ebx, eax
@@ -530,7 +543,7 @@ _start:
     int 80h
 
     mov eax, dword [BytesBuffer]
-    mov [elf_shoff], eax
+    mov [e_shoff], eax
     lea esi, [tmp_string]
     call itoa
     mov ecx, eax
@@ -542,8 +555,8 @@ _start:
     call print
     
     ;   print  Flags
-    mov ecx, elf_sh_flags_msg
-    mov edx, elf_sh_flags_msg_len
+    mov ecx, e_sh_flags_msg
+    mov edx, e_sh_flags_msg_len
     call print 
 
     mov eax, 3
@@ -559,8 +572,8 @@ _start:
     call newLine
     
     ;   print size of this header
-    mov ecx, elf_ehsize_msg
-    mov edx, elf_ehsize_msg_len
+    mov ecx, e_ehsize_msg
+    mov edx, e_ehsize_msg_len
     call print 
 
     mov eax, 3
@@ -581,8 +594,8 @@ _start:
     call print
 
     ;   print size of program header
-    mov ecx, elf_phentsize_msg
-    mov edx, elf_phentsize_msg_len
+    mov ecx, e_phentsize_msg
+    mov edx, e_phentsize_msg_len
     call print 
 
     mov eax, 3
@@ -592,7 +605,7 @@ _start:
     int 80h
 
     movzx eax, word [BytesBuffer]
-    mov [elf_phentsize], eax
+    mov [e_phentsize], eax
     lea esi, [tmp_string]
     call itoa
     mov ecx, eax
@@ -604,8 +617,8 @@ _start:
     call print
 
     ;print number of program header
-    mov ecx, elf_phnum_msg
-    mov edx, elf_phnum_msg_len
+    mov ecx, e_phnum_msg
+    mov edx, e_phnum_msg_len
     call print 
 
     mov eax, 3
@@ -615,7 +628,7 @@ _start:
     int 80h
 
     movzx eax, word [BytesBuffer]
-    mov [elf_phnum], eax
+    mov [e_phnum], eax
     lea esi, [tmp_string]
     call itoa
     mov ecx, eax
@@ -623,8 +636,8 @@ _start:
     call print
     call newLine
     ;   print Size of Section Header
-    mov ecx, elf_shentsize_msg
-    mov edx, elf_shentsize_msg_len
+    mov ecx, e_shentsize_msg
+    mov edx, e_shentsize_msg_len
     call print 
 
     mov eax, 3
@@ -634,7 +647,7 @@ _start:
     int 80h
 
     movzx eax, word [BytesBuffer]
-    mov [elf_shentsize], eax
+    mov [e_shentsize], eax
     lea esi, [tmp_string]
     call itoa
     mov ecx, eax
@@ -647,8 +660,8 @@ _start:
 
     
     ;   print Number of Section Headers
-    mov ecx, elf_shnum_msg
-    mov edx, elf_shnum_msg_len
+    mov ecx, e_shnum_msg
+    mov edx, e_shnum_msg_len
     call print 
 
     mov eax, 3
@@ -658,7 +671,7 @@ _start:
     int 80h
 
     movzx eax, word [BytesBuffer]
-    mov [elf_shnum], eax
+    mov [e_shnum], eax
     lea esi, [tmp_string]
     call itoa
     mov ecx, eax
@@ -667,8 +680,8 @@ _start:
     call newLine
 
     ;   print table index
-    mov ecx, elf_shstrndx_msg
-    mov edx, elf_shstrndx_msg_len
+    mov ecx, e_shstrndx_msg
+    mov edx, e_shstrndx_msg_len
     call print 
 
     mov eax, 3
@@ -678,7 +691,7 @@ _start:
     int 80h
     
     movzx eax, word [BytesBuffer]
-    mov [elf_shstrndx], eax
+    mov [e_shstrndx], eax
     lea esi, [tmp_string]
     call itoa
     mov ecx, eax
@@ -700,12 +713,12 @@ _start:
    
 
 
-    ;;;program header
-     mov ecx, ph_msg
+    ;;;program header   
+    mov ecx, ph_msg
     mov edx, ph_msg_len
     call print
 
-    mov eax, dword [elf_phoff]
+    mov eax,  [e_phoff]
     mov [cur_offset], eax
 
    ; point to Program Header 
@@ -717,46 +730,42 @@ _start:
     int 80h
 
     mov dword [count], 0h
-    .loop_p_print:
+    loop_p_print:
 
-    mov eax, dword [elf_phnum]
+    mov eax, dword [e_phnum]
     ;dec eax
    cmp dword [count], eax
-    je .done_p_print
+    je done_p_print
 
-;   print each member
+   ;   print each member
 
-    add dword [count], 1
+       add dword [count], 1
 
         ; print p_type
         mov eax, 3
         mov ebx, eax
         mov ecx, BytesBuffer
         mov edx, 4
-        int 80h
+        int 80h        
 
-        xor ecx, ecx
-        push ecx
-    .loop_p_type:
-        pop ecx
-        mov eax, dword [p_type_value_list + ecx * 4]
-        push ecx
-        cmp dword [BytesBuffer], eax 
-        je .found_p_type
-        pop ecx
-        inc ecx
-        push ecx
-        cmp ecx, 15
-        je .found_p_type
-        jmp .loop_p_type
-        .found_p_type:
-            mov ecx, [p_type_msg + ecx * 4]
-            mov edx, p_type_msg_len
-            call print
-            call printSpace
+        mov eax, [BytesBuffer]
+        cmp eax, 8
+        
+        jl breakDiv
+        mov edx,0
+        mov ecx, 0x1000000  ;; neu p_type > 8 thi chia cho 100000 de dua ve so nho
+        idiv ecx
+        
+        breakDiv:
+        shl eax,2
+        mov ecx, [p_type_msg+eax]
+        mov edx, p_type_msg_len
+        call print
+        
+        call printSpace
              
        ; save p_flags if 64bit
-        mov edx, dword [elf_arch]
+        mov edx, dword [e_arch]
         dec edx
         lea edx, [edx * 4]
         mov eax, 3
@@ -764,13 +773,14 @@ _start:
         mov ecx, BytesBuffer
         int 80h
 
-        cmp dword [elf_arch], 0x2
+        cmp dword [e_arch], 0x2
         jne .not_64
         movzx eax, word [BytesBuffer]
         mov [p_flags], eax
         .not_64:
+        
         ; print p_offset
-        mov edx, dword [elf_arch]
+        mov edx, dword [e_arch]
         lea edx, [edx * 4]
         mov eax, 3
         mov ebx, eax
@@ -779,16 +789,13 @@ _start:
 
 
         mov eax, dword [BytesBuffer]
-        ; mov ebx, dword [count]
-        ; dec ebx
-        ; mov dword [ph_vaddr_array + ebx * 4], eax
         lea edi, [tmp_string]
         mov ecx, 4
         call print_string
         call printSpace
         
         ; print p_vaddr
-        mov edx, dword [elf_arch]
+        mov edx, dword [e_arch]
         lea edx, [edx * 4]
         mov eax, 3
         mov ebx, eax
@@ -807,7 +814,7 @@ _start:
         
         
        ; print p_paddr
-        mov edx, dword [elf_arch]
+        mov edx, dword [e_arch]
         lea edx, [edx * 4]
         mov eax, 3
         mov ebx, eax
@@ -822,7 +829,7 @@ _start:
         call printSpace
      
        ; print p_filesz
-        mov edx, dword [elf_arch]
+        mov edx, dword [e_arch]
         lea edx, [edx * 4]
         mov eax, 3
         mov ebx, eax
@@ -838,7 +845,7 @@ _start:
         call printSpace
 
         ; print p_memsz
-        mov edx, dword [elf_arch]
+        mov edx, dword [e_arch]
         lea edx, [edx * 4]
         mov eax, 3
         mov ebx, eax
@@ -861,7 +868,7 @@ _start:
         
         ; print p_flags
         ; get p_flags if 32bit
-        mov edx, dword [elf_arch]
+        mov edx, dword [e_arch]
         and edx, 1
         lea edx, [edx * 4]
         mov eax, 3
@@ -869,33 +876,20 @@ _start:
         mov ecx, BytesBuffer
         int 80h
         
-        cmp dword [elf_arch], 0x1
-        jne .not_32
+        cmp dword [e_arch], 0x1
+        jne not_32
         movzx eax, word [BytesBuffer]
         mov [p_flags], eax
-        .not_32:
+        not_32:
 
-        xor ecx, ecx
-        push ecx
-    .loop_p_flags:
-        pop ecx
-        movzx eax, word [p_flags_value_list + ecx * 4]
-        push ecx
-        cmp dword [p_flags], eax 
-        je .found_p_flags
-        pop ecx
-        inc ecx
-        push ecx
-        cmp ecx, 6
-        je .found_p_flags
-        jmp .loop_p_flags
-        .found_p_flags:
-            mov ecx, [p_flags_msg + ecx * 4]
-            mov edx, p_flags_msg_len
-            call print
-            call printSpace
-         
-         mov edx, dword [elf_arch]
+        mov eax, [p_flags]
+        shl eax,2
+        mov ecx, [p_flags_msg+eax]
+        mov edx, p_flags_msg_len
+        call print
+        call printSpace
+        ; print p_Align
+        mov edx, dword [e_arch]
         lea edx, [edx * 4]
         mov eax, 3
         mov ebx, eax
@@ -908,15 +902,253 @@ _start:
         call print_string
         
         call newLine
-        jmp .loop_p_print
-    .done_p_print:
+        jmp loop_p_print
+    done_p_print:
   
-   
+  
+  
+  
+  
+    ;;print section header  
+    ;; con thieu  e flag
+    mov ecx, sectionHeader_msg
+    mov edx,sectionHeader_msg_len
+    call print
+    
+    mov eax,  [e_shentsize]
+    mov ebx,  [e_shstrndx]
+    imul eax, ebx
+    add eax,  [e_shoff]
+    
+    mov ecx,2
+    cmp ecx, dword [e_arch]
+    je _64bit
+    _32bit:
+    add eax, 0x10
+    jmp _breakbit
+    _64bit:
+    add eax,0x18
+    
+    _breakbit:
+    mov [NameSection_virtOffset], eax   
+    
+    mov ebx, [handle]
+    mov ecx, dword [NameSection_virtOffset]
+    mov edx, 0
+    mov eax, 19
+    int 80h   
+
+    mov eax, 3
+    mov ebx, eax
+    mov ecx, BytesBuffer
+    mov edx, 2
+    int 80h
+    
+    
+    
+    
+    ;; print section header  con thieu flag
+    mov eax,  [BytesBuffer]
+    mov [NameSection_offset], eax   ; offset .shstrtab
+    
+    mov eax, [e_shoff]
+    mov [cur_offset], eax
+    
+    mov edx,0 ; den so section dc in
+    push edx
+    _lapSectionHeader:
+    pop edx
+    cmp edx,[e_shnum]
+    je _breakSectionHeader
+    inc edx
+    push edx
+    
+    
+    mov ebx, [handle]
+    mov ecx, dword [cur_offset]
+    mov edx, 0
+    mov eax, 19
+    int 80h
+    
+    mov ecx, sectionHeader_msg
+    mov edx, sectionHeader_msg_len
+    
+    ; print name
+        mov eax, 3
+        mov ebx, eax
+        mov ecx, BytesBuffer
+        mov edx, 4
+        int 80h
+        
+        mov ecx,  [BytesBuffer]
+        add ecx,  [NameSection_offset]
+
+    call print_name_in_Section_Header
+        
+        ;; tra ve vi tri hien tai 
+        mov ebx, [handle]
+        mov ecx, dword [cur_offset]
+        add ecx, 4
+        mov edx, 0
+        mov eax, 19
+        int 80h
+    
+    call printSpace
+    ;print type 
+ 
+        mov eax, 3
+        mov ebx, eax
+        mov ecx, BytesBuffer
+        mov edx, 4
+        int 80h
+        
+        mov eax, [BytesBuffer]
+        shl eax,2
+        mov ecx, [sh_type_msg+eax]
+        mov edx, sh_type_msg_len
+        call print
+    
+    
+    ;;print flag
+        mov edx, dword [e_arch]
+        lea edx, [edx * 4]
+        mov eax, 3
+        mov ebx, eax
+        mov ecx, BytesBuffer
+        int 80h
+
+    
+    ;print addr
+     mov edx, dword [e_arch]
+        lea edx, [edx * 4]
+        mov eax, 3
+        mov ebx, eax
+        mov ecx, BytesBuffer
+        int 80h
+        
+        mov eax, dword [BytesBuffer]
+        lea edi, [tmp_string]
+        mov ecx, edx
+        call print_string
+        call printSpace
+     ;print offset
+        mov edx, dword [e_arch]
+        lea edx, [edx * 4]
+        mov eax, 3
+        mov ebx, eax
+        mov ecx, BytesBuffer
+        int 80h
+        
+        mov eax, dword [BytesBuffer]
+        lea edi, [tmp_string]
+        mov ecx, edx
+        call print_string
+        call printSpace
+        call printSpace
+        
+     ;print size
+        mov edx, dword [e_arch]
+        lea edx, [edx * 4]
+        mov eax, 3
+        mov ebx, eax
+        mov ecx, BytesBuffer
+        int 80h
+        
+        mov eax, dword [BytesBuffer]
+        lea edi, [tmp_string]
+        mov ecx, edx
+        call print_string
+        call printSpace   
+        call printSpace
+        
+     ;print link - lk
+        mov edx, 4
+        mov eax, 3
+        mov ebx, eax
+        mov ecx, BytesBuffer
+        int 80h
+        
+        mov eax, dword [BytesBuffer]
+        lea esi, [tmp_string]
+        call itoa
+        mov ecx, eax
+        mov edx, 10
+        call print
+        call setupSpace
+        
+        
+     ;print link - info
+        mov edx, 4
+        mov eax, 3
+        mov ebx, eax
+        mov ecx, BytesBuffer
+        int 80h
+        
+        mov eax, dword [BytesBuffer]
+        lea esi, [tmp_string]
+        call itoa
+        mov ecx, eax
+        mov edx, 10
+        call print
+
+        call setupSpace
+        call printSpace
+     ;print addralign - al
+        mov edx, dword [e_arch]
+        lea edx, [edx * 4]
+        mov eax, 3
+        mov ebx, eax
+        mov ecx, BytesBuffer
+        int 80h
+        
+        mov eax, dword [BytesBuffer]
+        lea esi, [tmp_string]
+        call itoa
+        mov ecx, eax
+        mov edx, 10
+        call print
+
+        call setupSpace
+        
+     ;print entsize - es
+        mov edx, 4
+        mov eax, 3
+        mov ebx, eax
+        mov ecx, BytesBuffer
+        int 80h
+        
+        mov eax, dword [BytesBuffer]
+        lea edi, [tmp_string]
+        mov ecx, edx
+        call print_string
+        
+    ;; tro cur_offset toi dia chi section tiep theo
+    mov eax,  [e_shentsize]
+    add  [cur_offset], eax
+    call newLine 
+     jmp _lapSectionHeader
+    _breakSectionHeader:
+    pop edx
+    
 
 
 call    quit                ; call our quit function
 
 
+
+
+; dung sau lenh print khi itoa
+setupSpace:
+        sub esi,tmp_string
+        sub esi,28
+        _lapPrintSpace:
+        cmp esi,0
+        je _breakPrintSpace
+        dec esi
+        call printSpace
+        jmp _lapPrintSpace    
+        _breakPrintSpace:
+        ret
 
  ;; print name in Section Header
     ;; Input: ecx - offset in file
@@ -925,9 +1157,12 @@ call    quit                ; call our quit function
         mov edx, 0
         mov eax, 19
         int 80h
-
+        mov edx,16
+        push edx
         loop_print_name:
-
+            pop edx
+            dec edx
+            push edx
             mov eax, 3
             mov ebx, eax
             mov ecx, singleByte
@@ -935,7 +1170,7 @@ call    quit                ; call our quit function
             int 80h
 
             cmp byte [singleByte], 0h
-            je .done
+            je _done
 
             mov edi, tmp_string
             mov ah, byte [singleByte]
@@ -947,8 +1182,24 @@ call    quit                ; call our quit function
             mov edx, 1
             call print 
             jmp loop_print_name
-        .done:
+        _done:
+
+        _lap:
+            pop edx
+            cmp edx, 0
+            je _break
+            dec edx
+            push edx
+            call printSpace
+            jmp _lap
+        _break:     
             ret
+
+quit:
+    mov     ebx, 0
+    mov     eax, 1
+    int     80h
+    ret
 
 newLine:
     mov edx,2
@@ -1045,7 +1296,7 @@ atoi :
 
 
 
- ;input eax: int 
+ ;input eax: int ;esi offset tempstring
  ;out put eax dia chi cua xau sau khi chuyen
     itoa: 
         add esi, 32      ; point to the last of result buffer
@@ -1083,7 +1334,6 @@ printString:
      pop ebx
      pop eax
      ret
-     
  ;input esi string
 ;output eax: length 
 strlen:

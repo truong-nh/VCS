@@ -65,18 +65,18 @@ fileHeader_members_size dd 2h, 2h, 4h, 4h, 4h, 2h, 2h
 
 ; Optional Header
 Opt db 0Ah, "Optional Header ", 0Ah,\
-                           "Member                  |Size  |Offset    |Value", 0Ah, 0h
+                           "Member                  |Size    |Offset    |Value", 0Ah, 0h
 
 ; Optional Header Standard Fields
-magic                   db "Magic                   |WORD  |", 0h
-majorLinkerVersion      db "MajorLinkerVersion      |Byte  |", 0h
-minorLinkerVersion      db "MinorLinkerVersion      |Byte  |", 0h
-sizeOfCode              db "SizeOfCode              |DWORD |", 0h
-sizeOfInitializedData   db "SizeOfInitializedData   |DWORD |", 0h
-sizeOfUninitializedData db "SizeOfUninitializedData |DWORD |", 0h
-addressOfEntryPoint     db "AddressOfEntryPoint     |DWORD |", 0h
-baseOfCode              db "BaseOfCode              |DWORD |", 0h
-baseOfData              db "BaseOfData              |DWORD |", 0h
+magic                   db "Magic                   |WORD    |", 0h
+majorLinkerVersion      db "MajorLinkerVersion      |Byte    |", 0h
+minorLinkerVersion      db "MinorLinkerVersion      |Byte    |", 0h
+sizeOfCode              db "SizeOfCode              |DWORD   |", 0h
+sizeOfInitializedData   db "SizeOfInitializedData   |DWORD   |", 0h
+sizeOfUninitializedData db "SizeOfUninitializedData |DWORD   |", 0h
+addressOfEntryPoint     db "AddressOfEntryPoint     |DWORD   |", 0h
+baseOfCode              db "BaseOfCode              |DWORD   |", 0h
+baseOfData              db "BaseOfData              |DWORD   |", 0h
 
 ;Optional Header Windows-Specified Fields
 imageBase               db "ImageBase               |", 0h
@@ -167,20 +167,8 @@ offset iat_size,offset delay_RVA,offset delay_size,offset comNet_RVA,offset comN
 
 
 ; Section Header 
-sectionHeader       db 0Ah, "SECTION HEADER", 0Ah, 0h
-virtualSize         db "    Virtual Size        |DWORD  |", 0h
-virtualAddress      db "    Virtual Address     |DWORD  |", 0h
-rawSize             db "    Raw Size            |DWORD  |", 0h
-rawAddress          db "    Raw Address         |DWORD  |", 0h
-relocAddress        db "    Reloc Address       |DWORD  |", 0h
-linenumbers         db "    Linenumbers         |DWORD  |", 0h
-relocNumbers        db "    Relocation Numbers  |WORD   |", 0h
-linenumbersNumber   db "    Linenumbers Number  |WORD   |", 0h
-characteristics_2   db "    Characteristics     |DWORD  |", 0h
-; msg for Section Header
-sectionHeader_msg   dq offset virtualAddress, offset virtualSize, offset rawSize,\
-offset rawAddress, offset relocAddress, offset linenumbers, offset relocNumbers,\
-offset linenumbersNumber, offset characteristics_2
+sectionHeader       db 0Ah, "SECTION HEADER", 0Ah,"Name      |Virtual Size  |VirtualAddress |RawSize       |Raw Address   |Reloc Address |LineNumbers|RelocaNum |LinenumNum |CharacTeristics" ,10,0h
+
 ; size of Section header's members 
 sectionHeader_members_size dd 6 dup (4), 2 dup (2), 4 
 virtAddr_array dd 20 dup (?)
@@ -214,17 +202,17 @@ expDir_member_size dd 4, 4, 2, 2, 4, 4, 4, 4, 4, 4, 4
 
 max_size EQU 17
 newLn db " ", 0Ah, 0h
-separator db "  |", 0h
+separator       db "      |", 0h
 
 FileName     db 400 dup(?)
 
 fileName_msg db "File Path: ", 0h
 
 
-byte_msg        db "Byte  |", 0h
-word_msg        db "WORD  |", 0h
-dword_msg       db "DWORD |", 0h 
-qword_msg       db "QWORD |", 0h
+byte_msg        db "Byte    |", 0h
+word_msg        db "WORD    |", 0h
+dword_msg       db "DWORD   |", 0h 
+qword_msg       db "QWORD   |", 0h
 
 tmp_string db max_size dup(?), 0h
 tmp_string1 db max_size dup(?), 0h
@@ -469,11 +457,12 @@ NtHeader_print proc
         call Dec2Hex
         invoke StdOut, offset tmp_string   ; print offset Signature = value e_lfanew
         mov esi, dword ptr [BytesBuffer]
-        add esi, 2
-        mov [cur_offset], esi
         mov [Nt_offset], esi
-        invoke StdOut, offset separator
-
+        add esi, 2
+        mov [cur_offset], esi      
+        push offset separator
+        call StdOut
+ 
         mov eax, dword ptr [BytesBuffer]
         sub eax, 3Eh
  
@@ -805,55 +794,59 @@ optionalHeader_print proc
 
         ;Section header
 
-    print_nameMemberOfSectionHeader proc
+    SectionHeader_print proc
+        push ebp
+        mov ebp, esp
+        invoke  CreateFile,ADDR FileName,GENERIC_READ,0,0,\
+                OPEN_EXISTING,FILE_ATTRIBUTE_NORMAL,0   
+        mov     hFile,eax
+
         push offset newLn
+        mov eax, dword ptr [Nt_offset]
+        add eax, 6
+
+        invoke ReadFile, hFile, addr buffer, eax, addr BytesRead,0
+        invoke ReadFile, hFile, addr BytesBuffer, 2, addr BytesRead, 0
+        mov ebx, dword ptr [BytesBuffer]
+        mov [numberOfSections_int], ebx
+
+        cmp [arch], 0
+        je SectionHeader_offset_32
+        mov eax, 256
+        jmp cont
+        SectionHeader_offset_32:
+            mov eax, 240
+        cont:
+        invoke ReadFile,hFile,addr buffer,eax,addr BytesRead,0
+        
+        ;;print Section Header msg
+        push offset sectionHeader
         call StdOut
 
-        xor esi, esi
-    _lap:
-        cmp esi, 8
-        je _break
-        invoke ReadFile,hFile,addr singleByte, 1,addr BytesRead,0
-        mov edi, offset tmp_string
-        mov ah, byte ptr [singleByte]
-        mov byte ptr [edi], ah
-        inc edi
-        mov byte ptr [edi], 0h
-        push offset tmp_string
-        call StdOut
-        inc esi
-        jmp _lap
-    _break:
-
-        ret
-    print_nameMemberOfSectionHeader endp
-
-    print_eachMemberOfSectionHeader proc
-    xor edx, edx
-    push edx
-    _lap:
+        xor edx, edx
+        push edx
+        _lap:
         pop edx
         cmp edx, dword ptr [numberOfSections_int]
         je _break
         inc edx
         push edx
-        call print_nameMemberOfSectionHeader
-        ;;print each member of Section Header
+        ;;print name
+         push offset newLn
+        call StdOut
+        invoke ReadFile,hFile,addr BytesBuffer, 8,addr BytesRead,0
+        push offset BytesBuffer
+        call StdOut
+        
+        ;print member of Section Header
             xor esi, esi
             push esi
         _lap2:
 
-            push offset newLn
-            call StdOut
-
-            mov eax, dword ptr [sectionHeader_msg + esi * 8]
-            push eax
+            push offset separator
             call StdOut
 
             mov eax, dword ptr [sectionHeader_members_size + esi * 4]
-            mov ebx, [cur_offset]
-            add ebx, eax
-            mov [cur_offset], ebx
             invoke ReadFile,hFile,addr BytesBuffer,eax,addr BytesRead,0
 
             mov eax, dword ptr [BytesBuffer]
@@ -868,11 +861,31 @@ optionalHeader_print proc
             push esi 
             jmp _lap2
         _break:
-        ret
-    print_eachMemberOfSectionHeader endp
 
-    SectionHeader_print proc
-        push ebp
+        invoke CloseHandle, hFile
+        mov esp, ebp
+        pop ebp
+        ret
+    SectionHeader_print endp
+    
+
+
+start:
+    push offset fileName_msg  
+    call StdOut
+
+    push 400
+    push offset FileName
+    call StdIn
+
+       
+    call formatFile
+    call DosHeader
+    call NtHeader_print
+    call SectionHeader_print
+
+
+    push ebp
         mov ebp, esp
         invoke  CreateFile,ADDR FileName,GENERIC_READ,0,0,\
                 OPEN_EXISTING,FILE_ATTRIBUTE_NORMAL,0   
@@ -880,9 +893,9 @@ optionalHeader_print proc
 
         push offset newLn
         mov eax, dword ptr [Nt_offset]
-        add eax, 4
+        add eax, 6
 
-        invoke ReadFile, hFile, addr buffer, eax, addr BytesRead,0
+        invoke SetFilePointer, hFile, eax, 0, FILE_BEGIN
         invoke ReadFile, hFile, addr BytesBuffer, 2, addr BytesRead, 0
         mov ebx, dword ptr [BytesBuffer]
         mov [numberOfSections_int], ebx
@@ -894,32 +907,11 @@ optionalHeader_print proc
         SectionHeader_offset_32:
             add eax, 239
         cont:
-        invoke ReadFile,hFile,addr buffer,eax,addr BytesRead,0
-        
-        ;;print Section Header msg
-        push offset sectionHeader
-        call StdOut
+        add eax, 12
+        invoke SetFilePointer, hFile, eax, 0, FILE_CURRENT
 
-        call print_eachMemberOfSectionHeader
-        invoke CloseHandle, hFile
-        mov esp, ebp
-        pop ebp
-        ret
-    SectionHeader_print endp
+        mov ebx, [cur_offset]
 
-
-start:
-    push offset fileName_msg  
-    call StdOut
-
-    push 400
-    push offset FileName
-    call StdIn
-
-    call formatFile
-    call DosHeader
-    call NtHeader_print
-    call SectionHeader_print
     invoke  ExitProcess,0
 
 END start
