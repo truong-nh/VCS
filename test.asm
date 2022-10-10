@@ -175,29 +175,9 @@ virtAddr_array dd 20 dup (?)
 rawAddr_array dd 20 dup (?)
 
 ; Import Directory message
-impDir_msg          db 0Ah, "[+] Import Directory", 0Ah, \
-                            "Module Name   | Imports   | OFTs      | TimeDateStamp | ForwarderChain | Name RVA | FTs (IAR) ", 0Ah, 0h
+impDir_msg          db 0Ah, "Import Directory", 0Ah, \
+ "Module Name     |OFTs        |TimeDateStamp  |ForwarderChain |Name RVA     | FTs (IAR) ", 0Ah, 0h
 
-; Export Directory message
-expDir_header       db 0Ah, "[+] Export Directory", 0Ah, \
-                           "Member                  |  Size  | Offset    | Value", 0Ah, 0h
-expDir_msg_1        db     "Characteristics         |DWORD |", 0h
-expDir_msg_2        db     "TimeDateStamp           |DWORD |", 0h
-expDir_msg_3        db     "MajorVersion            |WORD  |", 0h
-expDir_msg_4        db     "MinorVersion            |WORD  |", 0h
-expDir_msg_5        db     "Name                    |DWORD |", 0h
-expDir_msg_6        db     "Base                    |DWORD |", 0h
-expDir_msg_7        db     "NumberOfFunctions       |DWORD |", 0h
-expDir_msg_8        db     "NumberOfNames           |DWORD |", 0h
-expDir_msg_9        db     "AddressOfFunctions      |DWORD |", 0h
-expDir_msg_10       db     "AddressOfNames          |DWORD |", 0h
-expDir_msg_11       db     "AddressOfNameOrdinals   |DWORD |", 0h
-
-expDir_msg dq offset expDir_msg_1, offset expDir_msg_2, offset expDir_msg_3, offset expDir_msg_4, \
-offset expDir_msg_5, offset expDir_msg_6, offset expDir_msg_7, offset expDir_msg_8, \
-offset expDir_msg_9, offset expDir_msg_10, offset expDir_msg_11
-
-expDir_member_size dd 4, 4, 2, 2, 4, 4, 4, 4, 4, 4, 4
 
 
 max_size EQU 17
@@ -231,6 +211,9 @@ numberOfSections_int dd 1
 numberOfImportedDlls_int dd 1
 offsetOfImportDirRVA dd 1
 offsetOfExportDirRVA dd 1
+offsetImportDir      dd 1
+cur_offset1 dd 1 
+nameImportOffset dd 1
 
 counter_int dd 0
 exe_type dd 1           ; 0 for dll
@@ -801,7 +784,6 @@ optionalHeader_print proc
                 OPEN_EXISTING,FILE_ATTRIBUTE_NORMAL,0   
         mov     hFile,eax
 
-        push offset newLn
         mov eax, dword ptr [Nt_offset]
         add eax, 6
 
@@ -861,13 +843,185 @@ optionalHeader_print proc
             push esi 
             jmp _lap2
         _break:
+       
+        invoke CloseHandle, hFile
+        mov esp, ebp
+        pop ebp
+
+        ;;; luu gia tri virtual address vs raw address 
+        push ebp
+        mov ebp, esp
+        invoke  CreateFile,ADDR FileName,GENERIC_READ,0,0,\
+                OPEN_EXISTING,FILE_ATTRIBUTE_NORMAL,0   
+        mov     hFile,eax
+
+
+        mov eax, dword ptr [Nt_offset]
+        add eax, 6
+        invoke ReadFile, hFile, addr buffer, eax, addr BytesRead,0
+        invoke ReadFile, hFile, addr BytesBuffer, 2, addr BytesRead, 0
+       ; mov ebx, dword ptr [BytesBuffer]
+       ;  mov [numberOfSections_int], ebx
+       
+        cmp [arch], 0
+        je _SectionHeader_offset_32
+        mov eax, 256
+        jmp _cont1
+        _SectionHeader_offset_32:
+            mov eax, 240
+        _cont1:
+        add eax,12
+        invoke ReadFile,hFile,addr buffer,eax,addr BytesRead,0
+        
+        mov esi,0
+        push esi
+        _lap1:
+        pop esi
+        cmp esi, dword ptr [numberOfSections_int]
+        je _break1
+        push esi
+        ; luu gia tri virtual address cua moi section vao [virtAddr_array]
+        invoke ReadFile,hFile,addr BytesBuffer,4,addr BytesRead,0
+        mov eax, dword ptr [BytesBuffer]
+        pop esi
+        mov [virtAddr_array + esi * 4], eax
+        
+        push esi
+        
+        ; luu gia tri Raw address vao rawAddr_array 
+        invoke SetFilePointer, hFile, 4, 0, FILE_CURRENT
+        invoke ReadFile,hFile, addr BytesBuffer, 4, addr BytesRead, 0
+        mov eax, dword ptr [BytesBuffer]
+        
+        pop esi
+        mov [rawAddr_array + esi * 4], eax
+        push esi
+      
+        pop esi
+        inc esi
+        push esi
+        invoke SetFilePointer, hFile, 28, 0, FILE_CURRENT
+        jmp _lap1  
+        _break1:        
 
         invoke CloseHandle, hFile
         mov esp, ebp
         pop ebp
         ret
     SectionHeader_print endp
-    
+
+import_print proc
+        push ebp
+        mov ebp, esp
+        invoke  CreateFile,ADDR FileName,GENERIC_READ,0,0,\
+                OPEN_EXISTING,FILE_ATTRIBUTE_NORMAL,0   
+        mov     hFile,eax
+        
+
+        ;; find import director RVA
+         
+        mov eax, dword ptr [Nt_offset]
+        cmp [arch],0h
+        je  _importDirRVA32
+        add eax, 90h
+        jmp _importDirRVA64
+        _importDirRVA32:
+        add eax, 80h
+        _importDirRVA64: 
+        invoke SetFilePointer, hFile, eax, 0, FILE_BEGIN
+        invoke ReadFile, hFile, addr BytesBuffer, 2, addr BytesRead, 0
+        movzx ebx, word ptr [BytesBuffer]
+        
+        ;; find offset import director
+        movzx ebx, word ptr [BytesBuffer]
+        call convert_RVA_to_raw_offset
+        mov [cur_offset1],ebx
+        mov [cur_offset],ebx
+        
+        push offset impDir_msg
+        call StdOut
+        _lap:
+            
+            mov ebx, [cur_offset1]      
+            invoke SetFilePointer, hFile, ebx, 0, FILE_BEGIN
+             mov esi,1
+             push esi   
+            _test:
+            invoke ReadFile,hFile,addr BytesBuffer, 4,addr BytesRead,0
+            mov eax, [BytesBuffer]
+            cmp eax, 0
+            jne _pass
+            pop esi
+            je  _break 
+            inc esi 
+            push esi  
+            jmp _test 
+         _pass:
+        ;;print name
+            mov ebx, [cur_offset1]      
+            add ebx, 12
+            invoke SetFilePointer, hFile, ebx, 0, FILE_BEGIN
+            invoke ReadFile,hFile,addr BytesBuffer, 4,addr BytesRead,0
+           mov ebx, [BytesBuffer] 
+         call convert_RVA_to_raw_offset          
+        invoke SetFilePointer, hFile, ebx, 0, FILE_BEGIN
+        invoke ReadFile,hFile,addr BytesBuffer, 30,addr BytesRead,0
+        push offset BytesBuffer
+        call StdOut
+
+        ;print member 
+        mov ebx, [cur_offset1]       
+        invoke SetFilePointer, hFile, ebx, 0, FILE_BEGIN
+        mov esi,1
+        push esi
+        _lap2:
+
+            push offset separator
+            call StdOut
+
+            invoke ReadFile,hFile,addr BytesBuffer,4,addr BytesRead,0
+            add [cur_offset1],4
+            mov eax, dword ptr [BytesBuffer]
+            mov ecx, 4
+            mov edi, offset tmp_string
+            call print_string
+
+            pop esi
+            cmp esi, 5h
+            je _break2
+            inc esi 
+            push esi 
+            jmp _lap2
+        _break2:
+        push offset newLn
+        call StdOut 
+        jmp _lap
+        
+        _break:
+        invoke CloseHandle, hFile
+        mov esp, ebp
+        pop ebp
+        ret
+     
+import_print endp  
+
+    ;; Input:       ebx - RVA offset
+    ;; Output:      ebx - raw offset
+    convert_RVA_to_raw_offset proc
+        xor edx, edx
+        _lap:
+        cmp ebx, dword ptr [virtAddr_array + edx * 4]
+        jl _break
+        inc edx
+        cmp edx, dword ptr [numberOfSections_int]
+        je _break 
+        jmp _lap
+        _break:
+        dec edx
+        sub ebx, dword ptr [virtAddr_array + edx * 4]
+        add ebx, dword ptr [rawAddr_array + edx * 4]
+        ret
+    convert_RVA_to_raw_offset endp
 
 
 start:
@@ -885,33 +1039,14 @@ start:
     call SectionHeader_print
 
 
-    push ebp
-        mov ebp, esp
-        invoke  CreateFile,ADDR FileName,GENERIC_READ,0,0,\
-                OPEN_EXISTING,FILE_ATTRIBUTE_NORMAL,0   
-        mov     hFile,eax
 
-        push offset newLn
-        mov eax, dword ptr [Nt_offset]
-        add eax, 6
-
-        invoke SetFilePointer, hFile, eax, 0, FILE_BEGIN
-        invoke ReadFile, hFile, addr BytesBuffer, 2, addr BytesRead, 0
-        mov ebx, dword ptr [BytesBuffer]
-        mov [numberOfSections_int], ebx
-
-        cmp [arch], 0
-        je SectionHeader_offset_32
-        add eax, 255
-        jmp cont
-        SectionHeader_offset_32:
-            add eax, 239
-        cont:
-        add eax, 12
-        invoke SetFilePointer, hFile, eax, 0, FILE_CURRENT
-
-        mov ebx, [cur_offset]
-
+   push offset newLn
+   call StdOut
+    call import_print
+    
+ 
+      
+   
     invoke  ExitProcess,0
 
 END start
