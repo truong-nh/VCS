@@ -1,7 +1,8 @@
 
 SECTION .data
-filename db 'fileElfRead', 0h    ; the filename to create
-
+filename db 'add', 0h    ; the filename to create
+filePath_msg db 'filePath:    ',0h 
+ filePath_msg_len 	equ $-filePath_msg
  handle dd 0
 newline  db 10,0
 lpHexString	db "0123456789ABCDEF"
@@ -243,14 +244,10 @@ e_header_len 			equ $-e_header
     count dd 1
     count2 dd 1
     
-    
-    sh_vaddr_array times 200 dd 1
-    sh_name_offset_array times 200 dd 0
-    sh_vaddr_plus_size_array times 200 dd 1
     ph_vaddr_array times 200 dd 1
     ph_vaddr_plus_size_array times 200 dd 1  
 SECTION .bss
-fileContents resb 255,          ; variable to store file contents
+fileInput    resb 255,          ; variable to store file contents
 buffer       resb 200 
 BytesBuffer resb 200
 tmp_string resb 200
@@ -263,9 +260,24 @@ SECTION .text
 global  _start
  
 _start:
+    mov edx,filePath_msg_len
+    mov ecx,filePath_msg
+    mov ebx,1
+    mov eax,4
+    int 80h 
+    
+    mov edx, 256
+    mov ecx, fileInput
+    mov ebx, 0
+    mov eax, 3
+    int 80h             
+
+    mov esi, fileInput
+    call convertInput
+
     mov     edx, 0777
     mov     ecx, 0              ; Open file 
-    mov     ebx, filename
+    mov     ebx, fileInput
     mov     eax, 5
     int     80h
     mov [handle], eax
@@ -985,7 +997,6 @@ _start:
 
     call print_name_in_Section_Header
         
-        ;; tra ve vi tri hien tai 
         mov ebx, [handle]
         mov ecx, dword [cur_offset]
         add ecx, 4
@@ -1127,6 +1138,7 @@ _start:
     add  [cur_offset], eax
     call newLine 
      jmp _lapSectionHeader
+          
     _breakSectionHeader:
     pop edx
     
@@ -1313,43 +1325,15 @@ atoi :
         jnz .lap                ; if not -> loop
         mov eax, esi            ; else return result to eax
         ret      
-
-    
- ;esi offset string
-printString:
-     push eax
-     push ebx
-     push ecx
-     push edx
-
-     mov esi, esi
-     call strlen
-     mov edx, eax
-     call print
-     
-     call newLine
-     
-     pop edx
-     pop ecx
-     pop ebx
-     pop eax
-     ret
- ;input esi string
-;output eax: length 
-strlen:
-      push esi
-      push ecx
-      mov eax,0
-      .lap: 
-           movzx ecx, byte [esi]
-           cmp ecx, 0
-           je .break
-           cmp ecx, 10
-           je .break
-           inc eax
-           inc esi
-           jmp .lap
-       .break:
-       pop esi
-       pop ecx
-       ret          
+;input esi offset string convert
+convertInput:
+   .lap:
+   mov ah, byte[esi]
+   cmp ah, 0Ah
+   je .break
+   inc esi
+   jmp .lap
+   .break:
+   mov byte[esi],0
+   ret
+   
