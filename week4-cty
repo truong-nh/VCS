@@ -180,8 +180,8 @@ impDir_msg          db 0Ah, "Import Directory", 0Ah, \
 
 
 ;; Export Directory message
-expDir_header       db 0Ah, "[+] Export Directory", 0Ah, \
-                           "Member                  |  Size  | Offset    | Value", 0Ah, 0h
+expDir_header       db 0Ah, "Export Directory", 0Ah, \
+                           "Member                  |  Size  | Offset        | Value", 0Ah, 0h
 expDir_msg_1        db     "Characteristics         |  DWORD | ", 0h
 expDir_msg_2        db     "TimeDateStamp           |  DWORD | ", 0h
 expDir_msg_3        db     "MajorVersion            |  WORD  | ", 0h
@@ -199,6 +199,9 @@ offset expDir_msg_5, offset expDir_msg_6, offset expDir_msg_7, offset expDir_msg
 offset expDir_msg_9, offset expDir_msg_10, offset expDir_msg_11
 
 expDir_member_size dd 4, 4, 2, 2, 4, 4, 4, 4, 4, 4, 4
+
+expDir_header1       db 0Ah, "      Function RVA   |Name Ordinal  |Name RVA      |Name", 0Ah, 0h
+
 
 exportDirOffset dd 1
 
@@ -226,6 +229,7 @@ word_msg        db "WORD    |", 0h
 dword_msg       db "DWORD   |", 0h 
 qword_msg       db "QWORD   |", 0h
 
+space3   db "    ", 0h
 tmp_string db max_size dup(?), 0h
 tmp_string1 db max_size dup(?), 0h
 tmp_string2 db max_size dup(?), 0h
@@ -1046,7 +1050,8 @@ import_print endp
 
 
  export_print proc
-
+        push offset expDir_header
+        call StdOut
         push ebp
         mov ebp, esp
         invoke  CreateFile,ADDR FileName,GENERIC_READ,0,0,\
@@ -1146,12 +1151,109 @@ import_print endp
         mov ebx, dword ptr [BytesBuffer]
         mov [addressNameOrdinal], ebx
 
+         mov ebx,[addressFuncion]
+         call convert_RVA_to_raw_offset
+         mov [offsetFuncion], ebx
 
-    mov eax,ebx
-    mov esi,offset tmp_string
-    call itoa
-    push eax
-    call StdOut
+         mov ebx,[addressName]
+         call convert_RVA_to_raw_offset
+         mov [offsetName], ebx
+
+         mov ebx,[addressNameOrdinal]
+         call convert_RVA_to_raw_offset
+         mov [offsetNameOrdinal], ebx
+
+
+        push offset expDir_header1
+        call StdOut
+        
+        mov esi,0
+        push esi
+        _lap2:
+            ;; print Funcion RVA
+            mov ebx,[offsetFuncion]
+            pop esi
+            mov ecx,esi
+            push esi
+            shl ecx,2 
+            add ebx, ecx
+            invoke SetFilePointer, hFile, ebx, 0, FILE_BEGIN
+            
+            push offset separator
+            call StdOut
+
+            invoke ReadFile,hFile,addr BytesBuffer,4,addr BytesRead,0
+            mov eax, dword ptr [BytesBuffer]
+            mov ecx, 4
+            mov edi, offset tmp_string
+            call print_string
+
+
+            ;;print Name Ordinal
+            mov ebx,[offsetNameOrdinal]
+            pop esi
+            mov ecx,esi
+            push esi
+            shl ecx,1 
+            add ebx, ecx
+            invoke SetFilePointer, hFile, ebx, 0, FILE_BEGIN
+            
+            push offset separator
+            call StdOut
+
+            invoke ReadFile,hFile,addr BytesBuffer,2,addr BytesRead,0
+            mov eax, dword ptr [BytesBuffer]
+            mov ecx, 2
+            mov edi, offset tmp_string
+            call print_string
+
+            push offset space3
+            call StdOut
+
+            ;;print Name RVA
+            mov ebx,[offsetName]
+            pop esi
+            mov ecx,esi
+            push esi
+            shl ecx,2 
+            add ebx, ecx
+            invoke SetFilePointer, hFile, ebx, 0, FILE_BEGIN
+            
+            push offset separator
+            call StdOut
+
+            invoke ReadFile,hFile,addr BytesBuffer,4,addr BytesRead,0
+            mov eax, dword ptr [BytesBuffer]
+            mov ecx, 4
+            mov edi, offset tmp_string
+            call print_string
+
+            push offset separator
+            call StdOut
+
+            mov ebx, dword ptr [BytesBuffer]
+            call convert_RVA_to_raw_offset
+            invoke SetFilePointer, hFile, ebx, 0, FILE_BEGIN
+            invoke ReadFile,hFile,addr BytesBuffer, 30,addr BytesRead,0
+            push offset BytesBuffer
+            call StdOut
+
+
+
+            pop esi
+            inc esi
+            cmp esi, [numberFuncion] 
+            je _break2
+            
+            push esi
+            push offset newLn
+            call StdOut 
+
+             
+
+            jmp _lap2
+        _break2:
+         
         
 
         invoke CloseHandle, hFile
@@ -1196,17 +1298,12 @@ start:
     call DosHeader
     call NtHeader_print
     call SectionHeader_print
-
-
-
    push offset newLn
    call StdOut
-    call import_print
-
-    
+    call import_print 
    push offset newLn
    call StdOut
-    call export_print
+   call export_print
       
    
     invoke  ExitProcess,0
