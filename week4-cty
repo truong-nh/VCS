@@ -1050,8 +1050,7 @@ import_print endp
 
 
  export_print proc
-        push offset expDir_header
-        call StdOut
+        
         push ebp
         mov ebp, esp
         invoke  CreateFile,ADDR FileName,GENERIC_READ,0,0,\
@@ -1081,12 +1080,18 @@ import_print endp
         ;; find offset import director
         mov ebx, dword ptr [BytesBuffer] 
 
+        cmp ebx,0
+        je _break2
+
         call convert_RVA_to_raw_offset
         mov [cur_offset1],ebx
         mov [cur_offset],ebx
         mov [exportDirOffset],ebx 
  
         invoke SetFilePointer, hFile, ebx, 0, FILE_BEGIN
+
+        push offset expDir_header
+        call StdOut 
 
         xor esi, esi
         push esi
@@ -1298,12 +1303,17 @@ start:
     call DosHeader
     call NtHeader_print
     call SectionHeader_print
+
+
+
    push offset newLn
    call StdOut
-    call import_print 
+    call import_print
+
+    
    push offset newLn
    call StdOut
-   call export_print
+    call export_print
       
    
     invoke  ExitProcess,0
