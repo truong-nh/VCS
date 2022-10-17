@@ -200,6 +200,17 @@ offset expDir_msg_9, offset expDir_msg_10, offset expDir_msg_11
 
 expDir_member_size dd 4, 4, 2, 2, 4, 4, 4, 4, 4, 4, 4
 
+exportDirOffset dd 1
+
+numberFuncion dd 1
+addressFuncion dd 1
+addressName    dd 1
+addressNameOrdinal dd 1
+
+offsetFuncion dd 1
+offsetName dd 1
+offsetNameOrdinal dd 1
+
 
 max_size EQU 17
 newLn db " ", 0Ah, 0h
@@ -235,6 +246,8 @@ offsetOfExportDirRVA dd 1
 offsetImportDir      dd 1
 cur_offset1 dd 1 
 nameImportOffset dd 1
+
+
 
 counter_int dd 0
 exe_type dd 1           ; 0 for dll
@@ -1066,7 +1079,8 @@ import_print endp
         call convert_RVA_to_raw_offset
         mov [cur_offset1],ebx
         mov [cur_offset],ebx
-
+        mov [exportDirOffset],ebx 
+ 
         invoke SetFilePointer, hFile, ebx, 0, FILE_BEGIN
 
         xor esi, esi
@@ -1108,8 +1122,37 @@ import_print endp
 
          _done:
 
+        mov ebx,[exportDirOffset] 
+        add ebx,18h
+        invoke SetFilePointer, hFile, ebx, 0, FILE_BEGIN
+       
+        ;;numberOfFunction
+        invoke ReadFile, hFile, addr BytesBuffer, 4, addr BytesRead, 0
+        mov ebx, dword ptr [BytesBuffer]
+        mov [numberFuncion], ebx
         
+        ;;addressFuncion
+        invoke ReadFile, hFile, addr BytesBuffer, 4, addr BytesRead, 0
+        mov ebx, dword ptr [BytesBuffer]
+        mov [addressFuncion], ebx
+        
+        ;;addressName
+        invoke ReadFile, hFile, addr BytesBuffer, 4, addr BytesRead, 0
+        mov ebx, dword ptr [BytesBuffer]
+        mov [addressName], ebx
+        
+        ;;addressNameOrdinal
+        invoke ReadFile, hFile, addr BytesBuffer, 4, addr BytesRead, 0
+        mov ebx, dword ptr [BytesBuffer]
+        mov [addressNameOrdinal], ebx
 
+
+    mov eax,ebx
+    mov esi,offset tmp_string
+    call itoa
+    push eax
+    call StdOut
+        
 
         invoke CloseHandle, hFile
         mov esp, ebp
