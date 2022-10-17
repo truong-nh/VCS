@@ -200,7 +200,7 @@ offset expDir_msg_9, offset expDir_msg_10, offset expDir_msg_11
 
 expDir_member_size dd 4, 4, 2, 2, 4, 4, 4, 4, 4, 4, 4
 
-expDir_header1       db 0Ah, "      Function RVA   |Name Ordinal  |Name RVA      |Name", 0Ah, 0h
+expDir_header1       db 0Ah, "Ordinal       |Function RVA  |Name Ordinal  |Name RVA      |Name", 0Ah, 0h
 
 
 exportDirOffset dd 1
@@ -1175,6 +1175,17 @@ import_print endp
         mov esi,0
         push esi
         _lap2:
+            ;print ordinal
+            pop esi
+            mov eax,esi
+            add eax,1
+            push esi
+            mov ecx, 4
+            mov edi, offset tmp_string
+            call print_string
+ 
+            
+
             ;; print Funcion RVA
             mov ebx,[offsetFuncion]
             pop esi
