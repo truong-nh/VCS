@@ -3,63 +3,225 @@
 option casemap:none ; Case Sensitive
 
 include C:\masm32\include\masm32rt.inc
-; include C:\masm32\include\windows.inc ; defines alias such as NULL and STD_OUTPUT_HANDLE
-; include C:\masm32\include\kernel32.inc 
-; include C:\masm32\include\masm32.inc 
-includelib C:\masm32\lib\kernel32.lib 
-includelib C:\masm32\lib\masm32.lib
-includelib C:\masm32\lib\gdi32.lib
 
-WinMain proto :DWORD, :DWORD, :DWORD, :DWORD
-
-.const
-    ButtonID equ 1                                ; The control ID of the button control
-    EditID equ 2                                    ; The control ID of the edit control
-    IDM_GETTEXT equ 3
-    IDM_EXIT equ 4
+.const  
+    IDM_GETTEXT equ 1
+    DRAWING equ 1
+BALL_SIZE equ 20
+ 
 .data?
     hInstance HINSTANCE ?
-    hdc HDC ?
+    
+    ps PAINTSTRUCT <?>
+    hdc HDC ?  
+    right_bottom POINT <>
+    left_top POINT <>
 
     wc WNDCLASSEX <?>
     msg MSG <?>
     hwnd HWND ?
 
-    hEdit dd ?
-    hButton    dd ?
-    hPrint    dd ?
-    buffer db 100 dup(?)                    ; buffer to store the text retrieved from the edit box
-    buffer_2 db 100 dup(?) ; buffer to store the text retrieved from the
-.data
-    newline db 0Ah, 0h
-	ClassName        db "MyWinClass", 0                ; class name, will be registered below
-    AppName db "Reverse Text Box", 0h
-    state db 0
+    hPen_out HPEN ?
+    hPen_in HPEN ?
+    hOldPen HPEN ?
 
+    hEdit dd ?
+    hPrint    dd ?
+    textString db 32 dup(?)                    ; 
+.data
+	ClassName        db "Reverse", 0                ; class name, will be registered below
+    AppName db "Text Reverse", 0h
+
+       vector_X dd 6
+    vector_Y dd -6
+    RangeOfNumbers dd 1
+    state db 0
+ 
     WIN_WIDTH dd 1024
     WIN_HEIGHT dd 768
-
-	wcx        WNDCLASSEX <WNDCLASSEX, CS_HREDRAW or CS_VREDRAW, WndProc, 0, 0, 1, 2, 3, COLOR_BTNFACE+1, 0, ClassName, 4>
+ 
 
 .code
 
-reverse proc
-    add edi, eax
-    dec edi
-    @loop_length:
-        mov bh, byte ptr [edi]           
-        mov bl, byte ptr [esi]
-        mov byte ptr [esi], bh          
-        inc esi                
-        dec edi
-        dec eax
-        cmp eax, 0h
-        jge @loop_length               
-    mov byte ptr [esi], 0h
-    ret
-reverse endp
+;; generate random number in range
+;   Input: RangeOfNumbers:DWORD
+;   Output: eax - random number in range (0, RangeOfNumbers)
+gen_rand proc
+    @@:
+    db 0Fh, 0C7h, 0F0h                  ; rdrand eax
+    jnc @B                              ; Invalid number - try again
 
-WndProc proc hWnd:HWND, uMsg:UINT, wParam:WPARAM, lParam:LPARAM
+    ; Adjust EAX to the range
+    mov ecx, RangeOfNumbers             ; Range (0..RangeOfNumbers-1)
+    xor edx, edx                        ; Needed for DIV
+    div ecx                             ; EDX:EAX/ECX -> EAX remainder EDX
+    mov eax, edx                        ; Get the remainder
+    err_exit:
+    ret
+gen_rand endp
+
+moveBall proc
+    mov eax, dword ptr [vector_X]
+    mov ecx, dword ptr [vector_Y]
+
+    add left_top.x, eax
+    add left_top.y, ecx
+    add right_bottom.x, eax
+    add right_bottom.y, ecx
+
+    ret
+moveBall endp
+
+createBall proc
+    push hPen_out
+    push hdc
+    call SelectObject
+    mov eax, hOldPen
+
+    ; print ellipse
+    push right_bottom.y
+    push right_bottom.x
+    push left_top.y
+    push left_top.x
+    push hdc
+    call Ellipse
+
+    push hPen_in
+    push hdc
+    call SelectObject
+    mov eax, hOldPen
+
+    push hPen_in
+    push hdc
+    call SelectObject
+    mov eax, hOldPen
+    push right_bottom.y
+    push right_bottom.x
+    push left_top.y
+    push left_top.x
+    push hdc
+    call Ellipse  
+    
+    push hOldPen
+    push hdc
+    call SelectObject          
+
+    call moveBall
+
+    mov eax, WIN_WIDTH
+    sub eax, 30
+    cmp right_bottom.x, eax
+    jg meet_right_left
+
+    mov eax, WIN_HEIGHT
+    sub eax, 60
+    cmp right_bottom.y, eax
+    jg meet_bottom_top
+
+    cmp left_top.x, 14
+    jl meet_right_left
+
+    cmp left_top.y, 14
+    jl meet_bottom_top
+
+    jmp bouncing
+
+    meet_right_left:
+        neg vector_X
+        jmp bouncing
+
+    meet_bottom_top:
+        neg vector_Y
+        jmp bouncing
+
+    bouncing:
+        ret
+createBall endp
+
+TimerProc PROC thwnd:HWND, uMsg:UINT, idEvent:UINT, dwTime:DWORD
+        push TRUE
+        push NULL
+        push thwnd
+        call InvalidateRect
+        ret
+TimerProc ENDP
+
+updateXY proc lParam:LPARAM
+    cmp [state], DRAWING
+    je @drawing_update
+
+    mov eax, dword ptr [WIN_WIDTH]
+    sub eax, 50
+    mov dword ptr [RangeOfNumbers], eax
+    call gen_rand
+    add eax, 20
+    mov left_top.x, eax
+    mov right_bottom.x, eax
+    add right_bottom.x, BALL_SIZE
+
+    mov eax, dword ptr [WIN_HEIGHT]
+    sub eax, 50
+    mov dword ptr [RangeOfNumbers], eax
+    call gen_rand
+    add eax, 20
+    mov left_top.y, eax
+    mov right_bottom.y, eax
+    add right_bottom.y, BALL_SIZE
+
+    mov dword ptr [RangeOfNumbers], 4
+    call gen_rand
+    cmp eax, 0h                 ; ball go to top - right (default)
+    je @done_updateXY
+
+    cmp eax, 1h                 ; ball go to top - left
+    je @ball_go_to_top_left
+
+    cmp eax, 2h                 ; ball go to bottom - right
+    je @ball_go_to_bottom_right
+
+    cmp eax, 3h                 ; ball go to bottom - left
+    je @ball_go_to_bottom_left  
+@ball_go_to_top_left:
+    neg vector_X
+    ret
+@ball_go_to_bottom_right:
+    neg vector_Y
+    ret
+@ball_go_to_bottom_left:
+    neg vector_X
+    neg vector_Y
+    ret
+    
+@drawing_update:
+    mov eax, lParam
+
+    ; get low word that contain x
+    xor ebx, ebx
+    mov bx, ax
+
+    mov left_top.x, ebx
+    mov right_bottom.x, ebx
+    add right_bottom.x, BALL_SIZE
+
+    ; get high word that contain y
+    mov eax, lParam
+    shr eax, 16
+
+    mov left_top.y, eax
+    mov right_bottom.y, eax
+    add right_bottom.y, BALL_SIZE
+@done_updateXY:
+    ret
+updateXY endp
+
+
+
+
+
+WindowProcedure proc hWnd:HWND, uMsg:UINT, wParam:WPARAM, lParam:LPARAM
+
+   cmp uMsg, WM_PAINT
+    je start_WM_PAINT
 
     cmp uMsg, WM_CREATE
     je start_WM_CREATE
@@ -70,12 +232,6 @@ WndProc proc hWnd:HWND, uMsg:UINT, wParam:WPARAM, lParam:LPARAM
     cmp uMsg, WM_ACTIVATE
     je start_WM_ACTIVATE
 
-    cmp uMsg, WM_TIMER
-    je start_WM_TIMER
-
-    cmp uMsg, WM_COMMAND
-    je start_WM_COMMAND
-
     cmp uMsg, WM_QUIT
     je start_WM_CLOSE
 
@@ -84,92 +240,48 @@ WndProc proc hWnd:HWND, uMsg:UINT, wParam:WPARAM, lParam:LPARAM
 
     jmp start_default
 
-    start_WM_TIMER:
-        push 0h
-        push IDM_GETTEXT
-        push WM_COMMAND
-        push hwnd
-        call SendMessage
-
-        jmp exit_proc
-
-    start_WM_ACTIVATE:  
-
-        push 0h
-        push 100
-        push 10
-        push hwnd
-        call SetTimer  
-
-        jmp exit_proc
-
     start_WM_CREATE:
-	 
-      
-        push 0h
-        push wcx.hInstance
-        push 103
-        push hWnd
-        push 50
-        push 800
-        push 9
-        push 9
-        push WS_CHILD or WS_VISIBLE or WS_BORDER or ES_AUTOVSCROLL
-        push 0h
-        push chr$("edit")
-        push WS_EX_CLIENTEDGE
-        call CreateWindowEx
-        
-        mov hEdit, eax        ; you may need this global variable for further processing
+        push Black  ; create our pen
+        push 30
+        push PS_SOLID
+        call CreatePen
+        mov hPen_out, eax
 
-		
-        push 0h
-        push wcx.hInstance
-        push 104
-        push hWnd
-        push 50
-        push 800
-        push 200
-        push 9
-        push WS_CHILD or WS_VISIBLE or WS_BORDER or ES_AUTOVSCROLL or ES_READONLY or ES_NOHIDESEL
-        push 0h
-        push chr$("edit")
-        push WS_EX_CLIENTEDGE
-        call CreateWindowEx
-        
-        mov hPrint, eax
-
-        push hwnd
-        call SetFocus
-
-        push hwnd
-        call SetActiveWindow
+        push Red  ; create our pen
+        push 20
+        push PS_SOLID
+        call CreatePen
+        mov hPen_in, eax
 
         jmp exit_proc
+    start_WM_PAINT:
+        push offset ps
+        push hWnd
+        call BeginPaint
+        mov hdc, eax
+        
+        call createBall
 
-	start_WM_COMMAND:
-		movzx eax, word ptr wParam        ; the Ids are in the LoWord of wParam
+        push offset ps
+        push hWnd
+        call EndPaint
 
+        jmp exit_proc   
+    start_WM_ACTIVATE:
 
-        .IF ax==IDM_GETTEXT
-                push 90
-                push offset buffer
-                push hEdit
-                call GetWindowText
+            push lParam
+            call updateXY
 
-                lea edi, [buffer]
-                lea esi, [buffer_2]
-                call reverse
+            mov [state], DRAWING
 
-                push offset buffer_2
-                push FALSE
-                push WM_SETTEXT
-                push hPrint
-                call SendMessage
+            push OFFSET TimerProc
+            push 33
+            push 10
+            push hwnd
+            call SetTimer
 
-        .ELSE
-        .ENDIF
-            jmp exit_proc
+            jmp exit_proc          
+    ; user close program
     start_WM_CLOSE:
         push NULL
         call PostQuitMessage
@@ -179,25 +291,25 @@ WndProc proc hWnd:HWND, uMsg:UINT, wParam:WPARAM, lParam:LPARAM
         push wParam
         push uMsg
         push hWnd
-        call DefWindowProc 
+        call DefWindowProc
 
         jmp exit_proc
     exit_proc:
         ret
-WndProc endp 
 
-WinMain proc hInst:HINSTANCE, hPrevInst:HINSTANCE, CmdLine:LPSTR, CmdShow:DWORD
+WindowProcedure endp 
+
+WinMain proc hThisInstance:HINSTANCE, hPrevInstance:HINSTANCE, lpszArgument:LPSTR, CmdShow:DWORD
 
         mov wc.cbSize, SIZEOF WNDCLASSEX    ; size of this structure
-        mov wc.lpfnWndProc, OFFSET WndProc  ; andress of window procedure 
+        mov wc.lpfnWndProc, OFFSET WindowProcedure  ; andress of window procedure 
         mov wc.lpszClassName, OFFSET ClassName
 
-        ; we register our own class, named in ClassName
+        ; Register the window class
         push offset wc
         call RegisterClassEx
 
-        ; after register ClassName, we use it to create windows compond
-        ; https://msdn.microsoft.com/en-us/library/windows/desktop/ms632680(v=vs.85).aspx
+        ; The class is registered, let's create the program
         push NULL
         push hInstance
         push NULL
@@ -213,21 +325,15 @@ WinMain proc hInst:HINSTANCE, hPrevInst:HINSTANCE, CmdLine:LPSTR, CmdShow:DWORD
         call CreateWindowEx
         mov hwnd, eax 
 
-        ; display window
-        ; https://msdn.microsoft.com/en-us/library/windows/desktop/ms633548(v=vs.85).aspx
+        ; Make the window visible on the screen
         push CmdShow
         push hwnd
         call ShowWindow
 
-        ; update window
-        ; https://msdn.microsoft.com/en-us/library/windows/desktop/dd145167(v=vs.85).aspx
-        push hwnd
-        call UpdateWindow
 
-    ;Message Loop
+
+    ;Run the message loop
     MESSAGE_LOOP:
-        ; get message
-        ; https://msdn.microsoft.com/en-us/library/windows/desktop/ms644936(v=vs.85).aspx
         push 0
         push 0
         push NULL
@@ -235,24 +341,21 @@ WinMain proc hInst:HINSTANCE, hPrevInst:HINSTANCE, CmdLine:LPSTR, CmdShow:DWORD
         call GetMessage
 
         ; return in eax
-        ; if the function retrieves a message other than WM_QUIT, the return value is nonzero.
-        ; if the function retrieves the WM_QUIT message, the return value is zero.
         test eax, eax
         jle END_LOOP
 
-        ; translate virtual-key messages into character messages - ASCII in WM_CHAR
-        ; https://msdn.microsoft.com/en-us/library/windows/desktop/ms644955(v=vs.85).aspx
+        ; Translate virtual-key messages into character messages
         push offset msg
         call TranslateMessage
 
-        ; sends the message data to the window procedure responsible for the specific window the message is for.
-        ; https://msdn.microsoft.com/en-us/library/windows/desktop/ms644934(v=vs.85).aspx
+        ; Send message to WindowProcedure
         push offset msg
         call DispatchMessage
 
         jmp MESSAGE_LOOP
 
     END_LOOP:
+       ;  The program return-value is 0 - The value that PostQuitMessage() gave */
         mov eax, msg.wParam
     ret
 WinMain endp
