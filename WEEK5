@@ -32,13 +32,13 @@ BALL_SIZE equ 20
 	ClassName        db "Reverse", 0                ; class name, will be registered below
     AppName db "Text Reverse", 0h
 
-       vector_X dd 6
-    vector_Y dd -6
+    vector_X dd 10
+    vector_Y dd 10
     RangeOfNumbers dd 1
     state db 0
  
-    WIN_WIDTH dd 1024
-    WIN_HEIGHT dd 768
+    WIN_WIDTH dd 800
+    WIN_HEIGHT dd 600
  
 
 .code
@@ -213,9 +213,6 @@ updateXY proc lParam:LPARAM
 @done_updateXY:
     ret
 updateXY endp
-
-
-
 
 
 WindowProcedure proc hWnd:HWND, uMsg:UINT, wParam:WPARAM, lParam:LPARAM
