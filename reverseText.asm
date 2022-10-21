@@ -73,9 +73,6 @@ WindowProcedure proc hWnd:HWND, uMsg:UINT, wParam:WPARAM, lParam:LPARAM
     cmp uMsg, WM_CREATE
     je start_WM_CREATE
 
-    cmp uMsg, WM_DESTROY
-    je start_WM_CLOSE
-
     cmp uMsg, WM_ACTIVATE
     je start_WM_ACTIVATE
 
@@ -84,9 +81,6 @@ WindowProcedure proc hWnd:HWND, uMsg:UINT, wParam:WPARAM, lParam:LPARAM
 
     cmp uMsg, WM_COMMAND
     je start_WM_COMMAND
-
-    cmp uMsg, WM_QUIT
-    je start_WM_CLOSE
 
     cmp uMsg, WM_CLOSE
     je start_WM_CLOSE
