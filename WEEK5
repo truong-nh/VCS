@@ -7,7 +7,7 @@ include C:\masm32\include\masm32rt.inc
 .const  
     IDM_GETTEXT equ 1
     DRAWING equ 1
-BALL_SIZE equ 20
+    BALL_SIZE equ 10
  
 .data?
     hInstance HINSTANCE ?
@@ -43,31 +43,27 @@ BALL_SIZE equ 20
 
 .code
 
-;; generate random number in range
-;   Input: RangeOfNumbers:DWORD
-;   Output: eax - random number in range (0, RangeOfNumbers)
+;   Input: RangeOfNumbers
+;   Output: eax 
 gen_rand proc
-    @@:
-    db 0Fh, 0C7h, 0F0h                  ; rdrand eax
-    jnc @B                              ; Invalid number - try again
 
-    ; Adjust EAX to the range
-    mov ecx, RangeOfNumbers             ; Range (0..RangeOfNumbers-1)
-    xor edx, edx                        ; Needed for DIV
-    div ecx                             ; EDX:EAX/ECX -> EAX remainder EDX
-    mov eax, edx                        ; Get the remainder
-    err_exit:
+    db 0Fh, 0C7h, 0F0h      
+    mov ecx, RangeOfNumbers             
+    xor edx, edx                        
+    div ecx                          
+    mov eax, edx            
     ret
+
 gen_rand endp
 
 moveBall proc
     mov eax, dword ptr [vector_X]
-    mov ecx, dword ptr [vector_Y]
+    mov ebx, dword ptr [vector_Y]
 
     add left_top.x, eax
-    add left_top.y, ecx
+    add left_top.y, ebx
     add right_bottom.x, eax
-    add right_bottom.y, ecx
+    add right_bottom.y, ebx
 
     ret
 moveBall endp
@@ -148,7 +144,7 @@ TimerProc ENDP
 
 updateXY proc lParam:LPARAM
     cmp [state], DRAWING
-    je @drawing_update
+    je _drawing_update
 
     mov eax, dword ptr [WIN_WIDTH]
     sub eax, 50
@@ -171,28 +167,28 @@ updateXY proc lParam:LPARAM
     mov dword ptr [RangeOfNumbers], 4
     call gen_rand
     cmp eax, 0h                 ; ball go to top - right (default)
-    je @done_updateXY
+    je _done_updateXY
 
     cmp eax, 1h                 ; ball go to top - left
-    je @ball_go_to_top_left
+    je _ball_go_to_top_left
 
     cmp eax, 2h                 ; ball go to bottom - right
-    je @ball_go_to_bottom_right
+    je _ball_go_to_bottom_right
 
     cmp eax, 3h                 ; ball go to bottom - left
-    je @ball_go_to_bottom_left  
-@ball_go_to_top_left:
+    je _ball_go_to_bottom_left  
+_ball_go_to_top_left:
     neg vector_X
     ret
-@ball_go_to_bottom_right:
+_ball_go_to_bottom_right:
     neg vector_Y
     ret
-@ball_go_to_bottom_left:
+_ball_go_to_bottom_left:
     neg vector_X
     neg vector_Y
     ret
     
-@drawing_update:
+_drawing_update:
     mov eax, lParam
 
     ; get low word that contain x
@@ -210,7 +206,7 @@ updateXY proc lParam:LPARAM
     mov left_top.y, eax
     mov right_bottom.y, eax
     add right_bottom.y, BALL_SIZE
-@done_updateXY:
+_done_updateXY:
     ret
 updateXY endp
 
@@ -223,17 +219,8 @@ WindowProcedure proc hWnd:HWND, uMsg:UINT, wParam:WPARAM, lParam:LPARAM
     cmp uMsg, WM_CREATE
     je start_WM_CREATE
 
-    cmp uMsg, WM_DESTROY
-    je start_WM_CLOSE
-
     cmp uMsg, WM_ACTIVATE
     je start_WM_ACTIVATE
-
-    cmp uMsg, WM_QUIT
-    je start_WM_CLOSE
-
-    cmp uMsg, WM_CLOSE
-    je start_WM_CLOSE
 
     jmp start_default
 
