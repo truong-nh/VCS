@@ -1,6 +1,6 @@
-.386 ; 386 Processor Instruction Set
-.model flat, stdcall ; Flat memory model and stdcall method
-option casemap:none ; Case Sensitive
+.386 
+.model flat, stdcall 
+option casemap:none 
 
 include C:\masm32\include\masm32rt.inc
 
@@ -27,34 +27,34 @@ include C:\masm32\include\masm32rt.inc
 
     hEdit dd ?
     hPrint    dd ?
-    textString db 32 dup(?)                    ; 
+    textString db 32 dup(?)                    
 .data
-	ClassName        db "Reverse", 0                ; class name, will be registered below
-    AppName db "Text Reverse", 0h
+	ClassName        db "BouncingBall ", 0h                
+    AppName db "BouncingBall ", 0h
 
     vector_X dd 10
     vector_Y dd 10
-    RangeOfNumbers dd 1
+    randomNumber dd 1
     state db 0
  
-    WIN_WIDTH dd 800
+    WIN_WIDTH dd 500
     WIN_HEIGHT dd 600
  
 
 .code
 
-;   Input: RangeOfNumbers
+;   Input: randomNumber
 ;   Output: eax 
-gen_rand proc
-
-    db 0Fh, 0C7h, 0F0h      
-    mov ecx, RangeOfNumbers             
+random proc    
+    mov eax, esp
+    mov edx, esp   
+    mov ecx, randomNumber             
     xor edx, edx                        
     div ecx                          
     mov eax, edx            
     ret
 
-gen_rand endp
+random endp
 
 moveBall proc
     mov eax, dword ptr [vector_X]
@@ -104,21 +104,26 @@ createBall proc
 
     call moveBall
 
+    cmp left_top.x, BALL_SIZE
+    jl meet_right_left
+
+    cmp left_top.y, BALL_SIZE
+    jl meet_bottom_top
+
     mov eax, WIN_WIDTH
-    sub eax, 30
+    sub eax, BALL_SIZE
+    sub eax, BALL_SIZE
     cmp right_bottom.x, eax
     jg meet_right_left
 
     mov eax, WIN_HEIGHT
-    sub eax, 60
+    sub eax, BALL_SIZE
+    sub eax, BALL_SIZE
+    sub eax, BALL_SIZE
+    sub eax, BALL_SIZE
+    sub eax, BALL_SIZE
     cmp right_bottom.y, eax
     jg meet_bottom_top
-
-    cmp left_top.x, 14
-    jl meet_right_left
-
-    cmp left_top.y, 14
-    jl meet_bottom_top
 
     jmp bouncing
 
@@ -147,43 +152,43 @@ updateXY proc lParam:LPARAM
     je _drawing_update
 
     mov eax, dword ptr [WIN_WIDTH]
-    sub eax, 50
-    mov dword ptr [RangeOfNumbers], eax
-    call gen_rand
-    add eax, 20
+    sub eax, BALL_SIZE
+    mov dword ptr [randomNumber], eax
+    call random
+    add eax, BALL_SIZE
     mov left_top.x, eax
     mov right_bottom.x, eax
     add right_bottom.x, BALL_SIZE
 
     mov eax, dword ptr [WIN_HEIGHT]
-    sub eax, 50
-    mov dword ptr [RangeOfNumbers], eax
-    call gen_rand
-    add eax, 20
+    sub eax, BALL_SIZE
+    mov dword ptr [randomNumber], eax
+    call random
+    add eax, BALL_SIZE
     mov left_top.y, eax
     mov right_bottom.y, eax
     add right_bottom.y, BALL_SIZE
 
-    mov dword ptr [RangeOfNumbers], 4
-    call gen_rand
-    cmp eax, 0h                 ; ball go to top - right (default)
-    je _done_updateXY
+    mov dword ptr [randomNumber], 4
+    call random
+    cmp eax, 0h                 
+    je _done
 
-    cmp eax, 1h                 ; ball go to top - left
-    je _ball_go_to_top_left
+    cmp eax, 1h                 
+    je _top_left
 
-    cmp eax, 2h                 ; ball go to bottom - right
-    je _ball_go_to_bottom_right
+    cmp eax, 2h                 
+    je _bottom_right
 
-    cmp eax, 3h                 ; ball go to bottom - left
-    je _ball_go_to_bottom_left  
-_ball_go_to_top_left:
+    cmp eax, 3h                 
+    je _bottom_left  
+    _top_left:
     neg vector_X
     ret
-_ball_go_to_bottom_right:
+    _bottom_right:
     neg vector_Y
     ret
-_ball_go_to_bottom_left:
+    _bottom_left:
     neg vector_X
     neg vector_Y
     ret
@@ -206,25 +211,28 @@ _drawing_update:
     mov left_top.y, eax
     mov right_bottom.y, eax
     add right_bottom.y, BALL_SIZE
-_done_updateXY:
+_done:
     ret
 updateXY endp
 
 
 WindowProcedure proc hWnd:HWND, uMsg:UINT, wParam:WPARAM, lParam:LPARAM
 
-   cmp uMsg, WM_PAINT
-    je start_WM_PAINT
-
     cmp uMsg, WM_CREATE
-    je start_WM_CREATE
+    je _WM_CREATE
 
     cmp uMsg, WM_ACTIVATE
-    je start_WM_ACTIVATE
+    je _WM_ACTIVATE
 
-    jmp start_default
+    cmp uMsg, WM_PAINT
+    je _WM_PAINT
 
-    start_WM_CREATE:
+    cmp uMsg, WM_CLOSE
+    je _WM_CLOSE
+
+    jmp _default
+
+    _WM_CREATE:
         push Black  ; create our pen
         push 30
         push PS_SOLID
@@ -238,7 +246,7 @@ WindowProcedure proc hWnd:HWND, uMsg:UINT, wParam:WPARAM, lParam:LPARAM
         mov hPen_in, eax
 
         jmp exit_proc
-    start_WM_PAINT:
+    _WM_PAINT:
         push offset ps
         push hWnd
         call BeginPaint
@@ -251,7 +259,7 @@ WindowProcedure proc hWnd:HWND, uMsg:UINT, wParam:WPARAM, lParam:LPARAM
         call EndPaint
 
         jmp exit_proc   
-    start_WM_ACTIVATE:
+    _WM_ACTIVATE:
 
             push lParam
             call updateXY
@@ -265,12 +273,12 @@ WindowProcedure proc hWnd:HWND, uMsg:UINT, wParam:WPARAM, lParam:LPARAM
             call SetTimer
 
             jmp exit_proc          
-    ; user close program
-    start_WM_CLOSE:
+
+    _WM_CLOSE:
         push NULL
         call PostQuitMessage
         jmp exit_proc 
-    start_default:
+    _default:
         push lParam
         push wParam
         push uMsg
@@ -285,8 +293,10 @@ WindowProcedure endp
 
 WinMain proc hThisInstance:HINSTANCE, hPrevInstance:HINSTANCE, lpszArgument:LPSTR, CmdShow:DWORD
 
-        mov wc.cbSize, SIZEOF WNDCLASSEX    ; size of this structure
-        mov wc.lpfnWndProc, OFFSET WindowProcedure  ; andress of window procedure 
+
+        mov wc.cbSize, SIZEOF WNDCLASSEX   
+        mov wc.lpfnWndProc, OFFSET WindowProcedure  
+        mov wc.hbrBackground, COLOR_WINDOW
         mov wc.lpszClassName, OFFSET ClassName
 
         ; Register the window class
@@ -309,14 +319,14 @@ WinMain proc hThisInstance:HINSTANCE, hPrevInstance:HINSTANCE, lpszArgument:LPST
         call CreateWindowEx
         mov hwnd, eax 
 
+
         ; Make the window visible on the screen
         push CmdShow
         push hwnd
         call ShowWindow
 
 
-
-    ;Run the message loop
+           ;Run the message loop
     MESSAGE_LOOP:
         push 0
         push 0
@@ -342,6 +352,7 @@ WinMain proc hThisInstance:HINSTANCE, hPrevInstance:HINSTANCE, lpszArgument:LPST
        ;  The program return-value is 0 - The value that PostQuitMessage() gave */
         mov eax, msg.wParam
     ret
+
 WinMain endp
 
 start:  

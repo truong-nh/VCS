@@ -1316,17 +1316,18 @@ start:
     call SectionHeader_print
 
 
-
    push offset newLn
    call StdOut
-    call import_print
+   call import_print
 
     
    push offset newLn
    call StdOut
-    call export_print
+   call export_print
       
    
-    invoke  ExitProcess,0
+   inkey
+   push 0h
+   call ExitProcess
 
 END start
