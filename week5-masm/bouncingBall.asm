@@ -45,11 +45,11 @@ include C:\masm32\include\masm32rt.inc
 
 ;   Input: randomNumber
 ;   Output: eax 
-random proc    
-    mov eax, esp
-    mov edx, esp   
-    mov ecx, randomNumber             
-    xor edx, edx                        
+random proc     
+
+    db 0fh,0c7h,0f0h  
+    mov ecx, randomNumber     
+    xor edx, edx                               
     div ecx                          
     mov eax, edx            
     ret
